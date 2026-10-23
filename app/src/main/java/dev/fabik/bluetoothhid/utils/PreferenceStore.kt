@@ -1,0 +1,520 @@
+package dev.fabik.bluetoothhid.utils
+
+import android.bluetooth.BluetoothHidDeviceAppQosSettings
+import android.content.Context
+import android.graphics.Bitmap
+import android.os.Build
+import android.util.Log
+import android.util.Size
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.State
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.platform.LocalContext
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.preferencesOf
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.fabik.bluetoothhid.BuildConfig
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import zxingcpp.BarcodeReader
+
+// Active profile's DataStore — routes through ProfileManager so profile switches are reflected
+val Context.dataStore: DataStore<Preferences> get() = ProfileManager.currentStore(this)
+
+// CompositionLocal for reactive profile-aware DataStore access in composables
+val LocalDataStore = staticCompositionLocalOf<DataStore<Preferences>> {
+    error("LocalDataStore not provided — wrap your composable tree with CompositionLocalProvider(LocalDataStore provides ...)")
+}
+
+// Enums for type-safe preference values
+// Note: ordinal is used as index - no need for explicit val index
+enum class ConnectionMode {
+    HID, RFCOMM, EXTERNAL;
+    companion object {
+        fun fromIndex(index: Int) = entries.getOrNull(index) ?: HID
+    }
+}
+enum class KeyboardLayout(var value: String) {
+    US("us"), DE("de"), FR("fr"), GB("gb"), ES("es"),
+    IT("it"), TR("tr"), PL("pl"), CZ("cz"), PO("po"),
+    BR("br"), BE("be"), HU("hu");
+    companion object {
+        fun fromIndex(index: Int) = entries.getOrNull(index) ?: US
+    }
+}
+enum class ExtraKeys(val suffix: String?) {
+    NONE(null), ENTER("\n"), TAB("\t"), SPACE(" "), CUSTOM(null);
+    companion object {
+        // Shihab: Enter after the code by default, as the Awqaf sabr site and entry app expect.
+        fun fromIndex(index: Int) = entries.getOrNull(index) ?: ENTER
+    }
+}
+enum class Theme {
+    SYSTEM, LIGHT, DARK;
+    companion object {
+        fun fromIndex(index: Int) = entries.getOrNull(index) ?: SYSTEM
+    }
+}
+enum class FocusMode {
+    AUTO, MANUAL, MACRO, CONTINUOUS, EDOF, INFINITY, CONTINUOUS_PICTURE;
+    companion object {
+        fun fromIndex(index: Int) = entries.getOrNull(index) ?: AUTO
+    }
+}
+enum class ScanResolution(val size: Size) {
+    SD_480P(Size(640, 480)), HD_720P(Size(960, 720)),
+    FHD_1080P(Size(1440, 1080)), UHD_2160P(Size(2160, 1440));
+    companion object {
+        fun fromIndex(index: Int) = entries.getOrNull(index) ?: HD_720P
+    }
+}
+enum class ScanFrequency(val delayMs: Int) {
+    FASTEST(0), FAST(100), NORMAL(500), SLOW(1000);
+    companion object {
+        // Shihab: fast scanning by default (forms are scanned one after another).
+        fun fromIndex(index: Int) = entries.getOrNull(index) ?: FAST
+    }
+}
+enum class OverlayType {
+    SQUARE, RECTANGLE, CUSTOM;
+    companion object {
+        fun fromIndex(index: Int) = entries.getOrNull(index) ?: SQUARE
+    }
+}
+enum class Binarizer(val readerValue: BarcodeReader.Binarizer) {
+    LOCAL_AVERAGE(BarcodeReader.Binarizer.LOCAL_AVERAGE),
+    GLOBAL_HISTOGRAM(BarcodeReader.Binarizer.GLOBAL_HISTOGRAM),
+    FIXED_THRESHOLD(BarcodeReader.Binarizer.FIXED_THRESHOLD),
+    BOOL_CAST(BarcodeReader.Binarizer.BOOL_CAST);
+    companion object {
+        fun fromIndex(index: Int) = entries.getOrNull(index) ?: LOCAL_AVERAGE
+    }
+}
+enum class TextMode(val readerValue: BarcodeReader.TextMode) {
+    PLAIN(BarcodeReader.TextMode.PLAIN),
+    ECI(BarcodeReader.TextMode.ECI),
+    HRI(BarcodeReader.TextMode.HRI),
+    HEX(BarcodeReader.TextMode.HEX),
+    ESCAPED(BarcodeReader.TextMode.ESCAPED);
+    companion object {
+        fun fromIndex(index: Int) = entries.getOrNull(index) ?: HRI
+    }
+}
+enum class CropMode {
+    NONE, SCAN_AREA, BARCODE;
+    companion object {
+        fun fromIndex(index: Int) = entries.getOrNull(index) ?: NONE
+    }
+}
+enum class ClearAfterTime(val value: Long?) {
+    NEVER(null), ONE(1000), THREE(3000), FIVE(5000);
+    companion object {
+        fun fromIndex(index: Int) = entries.getOrNull(index) ?: NEVER
+    }
+}
+enum class ScanImageFormat(val mimeType: String, val extension: String) {
+    JPEG("image/jpeg", "jpg"), PNG("image/png", "png"),
+    WEBP_LOSSY("image/webp", "webp"), WEBP_LOSSLESS("image/webp", "webp");
+
+    fun toCompressFormat(): Bitmap.CompressFormat {
+        return when (this) {
+            JPEG -> Bitmap.CompressFormat.JPEG
+            PNG -> Bitmap.CompressFormat.PNG
+            WEBP_LOSSY ->
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    Bitmap.CompressFormat.WEBP_LOSSY
+                } else {
+                    Bitmap.CompressFormat.WEBP
+                }
+
+            WEBP_LOSSLESS ->
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    Bitmap.CompressFormat.WEBP_LOSSLESS
+                } else {
+                    Bitmap.CompressFormat.WEBP
+                }
+        }
+    }
+
+    companion object {
+        fun fromIndex(index: Int) = entries.getOrNull(index) ?: JPEG
+    }
+}
+enum class VolumeKeyAction {
+    NOTHING, SEND_VALUE, CLEAR_VALUE, RUN_OCR, OPEN_KEYBOARD, TOGGLE_FLASH, TOGGLE_ZOOM, TRIGGER_FOCUS;
+    companion object {
+        fun fromIndex(index: Int) = entries.getOrNull(index) ?: SEND_VALUE
+    }
+}
+enum class QosServiceType(val value: Int) {
+    BEST_EFFORT(BluetoothHidDeviceAppQosSettings.SERVICE_BEST_EFFORT),
+    GUARANTEED(BluetoothHidDeviceAppQosSettings.SERVICE_GUARANTEED);
+    companion object {
+        fun fromIndex(index: Int) = entries.getOrNull(index) ?: BEST_EFFORT
+    }
+}
+
+open class PreferenceStore {
+    // Simple generic preference class - no need for type-specific wrappers
+    open class Preference<T>(
+        val key: Preferences.Key<T>,
+        val defaultValue: T
+    ) {
+        // Safe: map value was stored via put(this, T) so the runtime type is always T
+        @Suppress("UNCHECKED_CAST")
+        fun extract(prefs: Map<Preference<*>, *>): T = prefs[this] as? T ?: defaultValue
+    }
+
+    // Enum preference that stores as Int but exposes as Enum
+    // Uses -1 as sentinel value, fromOrdinal must handle it and return default
+    class EnumPref<E : Enum<E>>(
+        key: Preferences.Key<Int>,
+        val fromOrdinal: (Int) -> E  // Public for direct access, must handle -1
+    ) : Preference<Int>(key, -1) {
+        // Get default enum value by calling fromOrdinal with -1
+        fun getDefaultEnum(): E = fromOrdinal(-1)
+
+        // Extract as enum from multi-preference map
+        fun extractEnum(prefs: Map<Preference<*>, *>): E {
+            val intValue = extract(prefs)
+            return fromOrdinal(intValue)
+        }
+    }
+
+    companion object {
+        var ALL_PREFS = mutableListOf<Preference<*>>()
+
+        // Simple infix functions to create preferences - no wrapper classes needed
+        private infix fun <T> Preferences.Key<T>.defaultsTo(value: T) =
+            Preference(this, value).also { ALL_PREFS.add(it) }
+
+        private infix fun <E : Enum<E>> Preferences.Key<Int>.enumDefaultsTo(
+            fromOrdinal: (Int) -> E
+        ) = EnumPref(this, fromOrdinal).also { ALL_PREFS.add(it) }
+
+        // Connection (Shihab defaults for the Awqaf sabr platform: auto connect, auto send, Enter, 20 ms, US layout)
+        val AUTO_CONNECT = booleanPreferencesKey("auto_connect") defaultsTo true
+        val CONNECTION_MODE = intPreferencesKey("connection_mode").enumDefaultsTo(ConnectionMode::fromIndex)
+
+        // Package names of external transport extensions that should receive scan broadcasts.
+        // Discovered via ExternalProtocol.discover().
+        val ENABLED_EXTERNAL_PLUGINS =
+            stringSetPreferencesKey("enabled_external_plugins") defaultsTo setOf()
+
+        // Parallel external output: when true, scans are ALSO forwarded to enabled plugins
+        // while in HID/RFCOMM mode (in EXTERNAL mode external output is implied/always on).
+        val ENABLE_EXTERNAL_OUTPUT = booleanPreferencesKey("enable_external_output") defaultsTo false
+        //val SHOW_UNNAMED = booleanPreferencesKey("show_unnamed") defaultsTo false // Removed
+        val SEND_WITH_VOLUME = booleanPreferencesKey("send_vol_key") defaultsTo false
+        val VOLUME_ACTION_UP =
+            intPreferencesKey("vol_action_up") enumDefaultsTo VolumeKeyAction::fromIndex
+        val VOLUME_ACTION_DOWN =
+            intPreferencesKey("vol_action_down") enumDefaultsTo VolumeKeyAction::fromIndex
+        val VOLUME_ON_RELEASE = booleanPreferencesKey("vol_on_release") defaultsTo false
+        val VOLUME_ZOOM_LEVEL = floatPreferencesKey("vol_action_zoom") defaultsTo 1f
+        val SEND_DELAY = floatPreferencesKey("send_delay") defaultsTo 20f
+        val KEYBOARD_LAYOUT = intPreferencesKey("keyboard_layout").enumDefaultsTo(KeyboardLayout::fromIndex)
+        val EXTRA_KEYS = intPreferencesKey("extra_keys").enumDefaultsTo(ExtraKeys::fromIndex)
+        val TEMPLATE_TEXT = stringPreferencesKey("template_text") defaultsTo ""
+        val ENABLE_JS = booleanPreferencesKey("enable_js") defaultsTo false
+        val JS_CODE = stringPreferencesKey("js_code") defaultsTo ""
+        val EXPAND_CODE = booleanPreferencesKey("expand_code") defaultsTo false
+        val INSECURE_RFCOMM = booleanPreferencesKey("insecure_rfcomm") defaultsTo false
+        val PRESERVE_UNSUPPORTED_PLACEHOLDERS = booleanPreferencesKey("preserve_unsupported_placeholders") defaultsTo false
+        val DIRECT_APPLY_TEMPLATE = booleanPreferencesKey("direct_apply_template") defaultsTo false
+        val QOS_SERVICE_TYPE =
+            intPreferencesKey("qos_service_type") enumDefaultsTo QosServiceType::fromIndex
+        val QOS_TOKEN_RATE = intPreferencesKey("qos_token_rate") defaultsTo 800
+        val QOS_TOKEN_BUCKET_SIZE = intPreferencesKey("qos_token_bucket_size") defaultsTo 9
+        val QOS_PEAK_BANDWIDTH = intPreferencesKey("qos_peak_bandwidth") defaultsTo 0
+        val QOS_LATENCY = intPreferencesKey("qos_latency") defaultsTo 11250
+        val QOS_DELAY_VARIATION = intPreferencesKey("qos_delay_variation") defaultsTo 11250
+
+        // Appearance
+        val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on") defaultsTo false
+        val ALLOW_SCREEN_ROTATION = booleanPreferencesKey("allow_screen_rotation") defaultsTo false
+        val SCANNER_FULL_SCREEN = booleanPreferencesKey("scanner_full_screen") defaultsTo false
+        val THEME = intPreferencesKey("theme").enumDefaultsTo(Theme::fromIndex)
+        val DYNAMIC_THEME = booleanPreferencesKey("dynamic_theme") defaultsTo false
+
+        // Camera
+        // val AUTO_FOCUS = booleanPreferencesKey("auto_focus") defaultsTo true // Removed
+        val FRONT_CAMERA = booleanPreferencesKey("front_camera") defaultsTo false
+        val FIX_EXPOSURE = booleanPreferencesKey("fix_exposure") defaultsTo false
+        val FOCUS_MODE = intPreferencesKey("focus_mode").enumDefaultsTo(FocusMode::fromIndex)
+        val PREVIEW_PERFORMANCE_MODE = booleanPreferencesKey("preview_performance_mode") defaultsTo false
+        val PREVIEW_STABILIZATION =
+            booleanPreferencesKey("preview_stabilization_mode") defaultsTo false
+        val SCAN_RESOLUTION = intPreferencesKey("scan_res").enumDefaultsTo(ScanResolution::fromIndex)
+        val INITIAL_ZOOM = floatPreferencesKey("initial_zoom") defaultsTo 1.0f
+        val ZOOM_GESTURES = stringSetPreferencesKey("zoom_gestures") defaultsTo setOf("0")
+        // val AUTO_ZOOM = booleanPreferencesKey("auto_zoom") defaultsTo false - Removed
+
+        // Scanner
+        val SCAN_FREQUENCY = intPreferencesKey("scan_freq").enumDefaultsTo(ScanFrequency::fromIndex)
+        val CODE_TYPES = stringSetPreferencesKey("code_types") defaultsTo setOf()
+        val SCAN_REGEX = stringPreferencesKey("scan_regex") defaultsTo ""
+        val RESTRICT_AREA = booleanPreferencesKey("restrict_area") defaultsTo true
+        val FULL_INSIDE = booleanPreferencesKey("full_inside") defaultsTo true
+        val OVERLAY_TYPE = intPreferencesKey("overlay_type").enumDefaultsTo(OverlayType::fromIndex)
+        val AUTO_SEND = booleanPreferencesKey("auto_send") defaultsTo true
+        val MULTI_CODE_DETECTION = booleanPreferencesKey("multi_code_detection") defaultsTo false
+        val PLAY_SOUND = booleanPreferencesKey("play_sound") defaultsTo false
+        val VIBRATE = booleanPreferencesKey("vibrate") defaultsTo false
+        val AUTO_COPY_TO_CLIPBOARD = booleanPreferencesKey("auto_copy_to_clipboard") defaultsTo false
+        val CLEAR_AFTER_SEND = booleanPreferencesKey("clear_after_send") defaultsTo false
+        val ENABLE_UNDO_SEND = booleanPreferencesKey("enable_undo_send") defaultsTo false
+        val CLEAR_AFTER_TIME =
+            intPreferencesKey("clear_after_time") enumDefaultsTo ClearAfterTime::fromIndex
+
+        // val RAW_VALUE = booleanPreferencesKey("raw_value") defaultsTo false - Removed
+        // val SHOW_POSSIBLE = booleanPreferencesKey("show_possible") defaultsTo false - Removed
+        // val HIGHLIGHT_TYPE = intPreferencesKey("highlight").enumDefaultsTo(Highlight::fromIndex) // Box - Removed
+        val PRIVATE_MODE = booleanPreferencesKey("private_mode") defaultsTo false
+        val PERSIST_HISTORY = booleanPreferencesKey("persist_history") defaultsTo true
+
+        val ADV_TRY_HARDER = booleanPreferencesKey("adv_try_harder") defaultsTo true
+        val ADV_TRY_ROTATE = booleanPreferencesKey("adv_try_rotate") defaultsTo true
+        val ADV_TRY_INVERT = booleanPreferencesKey("adv_try_invert") defaultsTo false
+        val ADV_TRY_DOWNSCALE = booleanPreferencesKey("adv_try_downscale") defaultsTo false
+        val ADV_TRY_DENOISE = booleanPreferencesKey("adv_try_denoise") defaultsTo false
+        val ADV_MIN_LINE_COUNT = intPreferencesKey("adv_min_line_count") defaultsTo 2
+        val ADV_BINARIZER = intPreferencesKey("adv_binarizer").enumDefaultsTo(Binarizer::fromIndex)
+        val ADV_DOWNSCALE_FACTOR = intPreferencesKey("adv_downscale_factor") defaultsTo 3
+        val ADV_DOWNSCALE_THRESHOLD = intPreferencesKey("adv_downscale_threshold") defaultsTo 500
+        val ADV_TEXT_MODE = intPreferencesKey("adv_text_mode").enumDefaultsTo(TextMode::fromIndex)
+
+        val SAVE_SCAN = booleanPreferencesKey("save_scan") defaultsTo false
+        val SAVE_SCAN_PATH = stringPreferencesKey("save_scan_path") defaultsTo ""
+        val SAVE_SCAN_CROP_MODE =
+            intPreferencesKey("save_scan_crop_mode") enumDefaultsTo CropMode::fromIndex
+        val SAVE_SCAN_QUALITY = intPreferencesKey("save_scan_quality") defaultsTo 70
+        val SAVE_SCAN_FILE_PATTERN =
+            stringPreferencesKey("save_scan_file_pattern") defaultsTo "scan_{TIMESTAMP}"
+        val SAVE_SCAN_IMAGE_FORMAT =
+            intPreferencesKey("save_scan_filetype") enumDefaultsTo ScanImageFormat::fromIndex
+
+        val DEVELOPER_MODE = booleanPreferencesKey("developer_mode") defaultsTo BuildConfig.DEBUG
+        val OCR_COMPAT = booleanPreferencesKey("ocr_compat") defaultsTo false
+
+        // Utility preferences
+        val OVERLAY_POS_X = floatPreferencesKey("overlay_pos_x") defaultsTo 0.0f
+        val OVERLAY_POS_Y = floatPreferencesKey("overlay_pos_y") defaultsTo 0.0f
+        val OVERLAY_WIDTH = floatPreferencesKey("overlay_width") defaultsTo 100.0f
+        val OVERLAY_HEIGHT = floatPreferencesKey("overlay_height") defaultsTo 100.0f
+        val SCAN_AREAS = stringPreferencesKey("scan_areas") defaultsTo ""
+        val FAVOURITE_DEVICES = stringSetPreferencesKey("favourite_devices") defaultsTo setOf()
+    }
+}
+
+suspend fun Context.exportPreferences(): String {
+    val map = dataStore.data.first().asMap().toMutableMap()
+    // Include unchanged preferences
+    PreferenceStore.ALL_PREFS.forEach { map.putIfAbsent(it.key, it.defaultValue as Any) }
+    val json = JSONObject(map.mapKeys { it.key.name })
+    return json.toString(2)
+}
+
+suspend fun Context.importPreferences(json: String): Int {
+    val obj = JSONObject(json)
+    var count = 0
+    dataStore.edit { prefs ->
+        for (pref in PreferenceStore.ALL_PREFS) {
+            val key = pref.key
+            // Should this change the preference to default instead?
+            if (!obj.has(key.name)) continue
+            runCatching {
+                val prev = prefs[key]
+                // Each branch casts key to the concrete type matched by defaultValue — safe by construction
+                @Suppress("UNCHECKED_CAST")
+                when (pref.defaultValue) {
+                    is Boolean -> prefs[key as Preferences.Key<Boolean>] = obj.getBoolean(key.name)
+                    is Int -> prefs[key as Preferences.Key<Int>] = obj.getInt(key.name)
+                    is Long -> prefs[key as Preferences.Key<Long>] = obj.getLong(key.name)
+                    is Float -> prefs[key as Preferences.Key<Float>] =
+                        obj.getDouble(key.name).toFloat()
+
+                    is Double -> prefs[key as Preferences.Key<Double>] = obj.getDouble(key.name)
+                    is Set<*> -> prefs[key as Preferences.Key<Set<*>>] = buildSet {
+                        val arr = obj.getJSONArray(key.name)
+                        (0..arr.length()).forEach { add(arr.getString(it)) }
+                    }
+
+                    else -> prefs[key as Preferences.Key<String>] = obj.getString(key.name)
+                }
+                Log.d("PreferenceStore", "Set $key from '${prev}' to '${prefs[key]}'")
+                count += 1
+            }.onFailure {
+                Log.e("PreferenceStore", "Error importing preference ${key.name}", it)
+            }
+        }
+    }
+    return count
+}
+
+suspend fun <T> Context.setPreference(pref: PreferenceStore.Preference<T>, value: T) {
+    withContext(Dispatchers.IO) {
+        dataStore.edit {
+            it[pref.key] = value
+        }
+    }
+}
+
+fun <T> Context.getPreference(pref: PreferenceStore.Preference<T>): Flow<T> = dataStore.data
+    .catch { e ->
+        Log.e("PreferenceStore", "Error reading preference", e)
+        emit(preferencesOf(pref.key to pref.defaultValue))
+    }
+    .map {
+        it[pref.key] ?: pref.defaultValue
+    }
+    .flowOn(Dispatchers.IO)
+
+fun Context.getPreferences(vararg prefs: PreferenceStore.Preference<*>): Flow<Map<PreferenceStore.Preference<*>, *>> {
+    return dataStore.data
+        .catch { e ->
+            Log.e("PreferenceStore", "Error reading preferences", e)
+            emit(emptyPreferences())
+        }
+        .map { preferences ->
+            prefs.associateWith { pref ->
+                preferences[pref.key] ?: pref.defaultValue
+            }
+        }
+        .flowOn(Dispatchers.IO)
+}
+
+@Composable
+fun Context.getMultiPreferenceState(vararg prefs: PreferenceStore.Preference<*>): State<Map<PreferenceStore.Preference<*>, *>?> {
+    val dataStore = LocalDataStore.current
+    return remember(*prefs, dataStore) {
+        dataStore.data
+            .catch { e ->
+                Log.e("PreferenceStore", "Error reading preferences", e)
+                emit(emptyPreferences())
+            }
+            .map { preferences -> prefs.associateWith { pref -> preferences[pref.key] ?: pref.defaultValue } }
+            .flowOn(Dispatchers.IO)
+    }.collectAsStateWithLifecycle(null)
+}
+
+@Composable
+fun <T> Context.getPreferenceStateDefault(
+    pref: PreferenceStore.Preference<T>,
+    initial: T = pref.defaultValue
+): State<T> {
+    val dataStore = LocalDataStore.current
+    val flow = remember(pref.key, dataStore) {
+        dataStore.data
+            .catch { e ->
+                Log.e("PreferenceStore", "Error reading preference", e)
+                emit(preferencesOf(pref.key to pref.defaultValue))
+            }
+            .map { it[pref.key] ?: pref.defaultValue }
+            .flowOn(Dispatchers.IO)
+    }
+    return flow.collectAsState(initial)
+}
+
+@Composable
+fun <T> Context.getPreferenceState(pref: PreferenceStore.Preference<T>): State<T?> {
+    val dataStore = LocalDataStore.current
+    val flow = remember(pref.key, dataStore) {
+        dataStore.data
+            .catch { e ->
+                Log.e("PreferenceStore", "Error reading preference", e)
+                emit(preferencesOf(pref.key to pref.defaultValue))
+            }
+            .map { it[pref.key] }
+            .flowOn(Dispatchers.IO)
+    }
+    return flow.collectAsState(null)
+}
+
+@Composable
+fun <T> Context.getPreferenceStateBlocking(pref: PreferenceStore.Preference<T>): State<T> {
+    val dataStore = LocalDataStore.current
+    val flow = remember(pref.key, dataStore) {
+        dataStore.data
+            .catch { e ->
+                Log.e("PreferenceStore", "Error reading preference", e)
+                emit(preferencesOf(pref.key to pref.defaultValue))
+            }
+            .map { it[pref.key] ?: pref.defaultValue }
+            .flowOn(Dispatchers.IO)
+    }
+    val initial = remember(pref.key, dataStore) { runBlocking { flow.first() } }
+    return flow.collectAsState(initial)
+}
+
+@Composable
+fun <T> rememberPreference(
+    pref: PreferenceStore.Preference<T>,
+): MutableState<T> {
+    val context = LocalContext.current
+    val dataStore = LocalDataStore.current
+    val scope = rememberCoroutineScope()
+    val state = context.getPreferenceStateBlocking(pref)
+
+    return remember(pref.key, dataStore) {
+        object : MutableState<T> {
+            override var value: T
+                get() = state.value
+                set(value) {
+                    scope.launch {
+                        context.setPreference(pref, value)
+                    }
+                }
+
+            override fun component1(): T = value
+            override fun component2(): (T) -> Unit = { value = it }
+        }
+    }
+}
+
+@Composable
+fun <E : Enum<E>> rememberEnumPreference(
+    pref: PreferenceStore.EnumPref<E>,
+): MutableState<E> {
+    val context = LocalContext.current
+    val dataStore = LocalDataStore.current
+    val scope = rememberCoroutineScope()
+    val intState = context.getPreferenceStateBlocking(pref)
+
+    // dataStore added as key so the object is recreated when profile switches,
+    // picking up the new intState from the new store
+    return remember(pref.key, dataStore) {
+        object : MutableState<E> {
+            override var value: E
+                get() = pref.fromOrdinal(intState.value)
+                set(value) {
+                    scope.launch {
+                        context.setPreference(pref, value.ordinal)
+                    }
+                }
+
+            override fun component1(): E = value
+            override fun component2(): (E) -> Unit = { value = it }
+        }
+    }
+}

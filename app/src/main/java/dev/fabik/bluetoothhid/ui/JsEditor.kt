@@ -1,0 +1,320 @@
+package dev.fabik.bluetoothhid.ui
+
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.TextFieldBuffer
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.VerticalDivider
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringArrayResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import dev.fabik.bluetoothhid.R
+import dev.fabik.bluetoothhid.utils.PreferenceStore
+import dev.fabik.bluetoothhid.utils.rememberJsEngineService
+import dev.fabik.bluetoothhid.utils.rememberPreference
+import kotlinx.coroutines.launch
+
+/**
+ * Input transformation for the JavaScript editor that provides minimal IDE-like assistance:
+ * - Auto-pairs quotes (" and ') and brackets ({}, (), [])
+ * - Inserts a new line with the same indentation after a semicolon
+ * - Preserves the indentation of the previous line when pressing Enter
+ */
+@OptIn(ExperimentalFoundationApi::class)
+private object JsInputTransformation : InputTransformation {
+    override fun TextFieldBuffer.transformInput() {
+        // Only handle single-change events (ignore multi-change e.g. paste)
+        if (changes.changeCount != 1) return
+
+        val originalRange = changes.getOriginalRange(0)
+        val newRange = changes.getRange(0)
+
+        // Only handle single character insertions (no deletions or replacements)
+        if (originalRange.length != 0 || newRange.length != 1) return
+
+        val cursor = newRange.end
+        val insertedChar = asCharSequence()[newRange.start]
+
+        when (insertedChar) {
+            // Auto-pair quotes: insert closing quote and keep cursor between them
+            '"', '\'' -> {
+                // Skip if the next char is already the same quote (avoid double-pairing)
+                if (asCharSequence().getOrNull(cursor) == insertedChar) return
+                replace(cursor, cursor, insertedChar.toString())
+                placeCursorBeforeCharAt(cursor)
+            }
+            // Auto-pair brackets: insert closing bracket and keep cursor between them
+            '(' -> { replace(cursor, cursor, ")"); placeCursorBeforeCharAt(cursor) }
+            '[' -> { replace(cursor, cursor, "]"); placeCursorBeforeCharAt(cursor) }
+            '{' -> { replace(cursor, cursor, "}"); placeCursorBeforeCharAt(cursor) }
+            // Semicolon: insert a new line with the same indentation as the current line
+            ';' -> {
+                val text = asCharSequence().toString()
+                val lineStart = (text.lastIndexOf('\n', cursor - 2) + 1).coerceAtLeast(0)
+                val indentation = text.substring(lineStart, cursor - 1).takeWhile { it == ' ' || it == '\t' }
+                replace(cursor, cursor, "\n$indentation")
+                placeCursorAfterCharAt(cursor + indentation.length)
+            }
+            // Enter: preserve the indentation of the previous line
+            '\n' -> {
+                val text = asCharSequence().toString()
+                val lineStart = (text.lastIndexOf('\n', cursor - 2) + 1).coerceAtLeast(0)
+                val indentation = text.substring(lineStart, cursor - 1).takeWhile { it == ' ' || it == '\t' }
+                if (indentation.isNotEmpty()) {
+                    replace(cursor, cursor, indentation)
+                    placeCursorAfterCharAt(cursor + indentation.length - 1)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun JavaScriptOption() {
+    val jsDialog = rememberDialogState()
+    var jsEnabled by rememberPreference(PreferenceStore.ENABLE_JS)
+    ButtonPreference(
+        title = stringResource(R.string.custom_javascript),
+        desc = stringResource(R.string.custom_js_desc),
+        icon = Icons.Default.Code,
+        extra = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                VerticalDivider(
+                    Modifier
+                        .height(32.dp)
+                        .padding(horizontal = 24.dp)
+                )
+                Switch(jsEnabled, onCheckedChange = {
+                    jsEnabled = it
+                }, modifier = Modifier.semantics(mergeDescendants = true) {
+                    stateDescription = "Custom JavaScript is ${if (jsEnabled) "On" else "Off"}"
+                })
+            }
+        },
+        onClick = jsDialog::open
+    )
+    JavaScriptEditorDialog(jsDialog)
+}
+
+@Composable
+fun JavaScriptEditorDialog(jsDialog: DialogState) {
+    var codePreference by rememberPreference(PreferenceStore.JS_CODE)
+    var codeText by remember { mutableStateOf(codePreference) }
+
+    val outString = stringResource(R.string.press_run_to_evaluate)
+    var outputText by remember(jsDialog.openState) { mutableStateOf(outString) }
+
+    ConfirmDialog(
+        dialogState = jsDialog,
+        title = stringResource(R.string.custom_javascript),
+        onDismiss = {
+            close()
+        }, onConfirm = {
+            close()
+            codePreference = codeText
+        }
+    ) {
+        val context = LocalContext.current
+        val scope = rememberCoroutineScope()
+        val jsEngine = rememberJsEngineService(context)
+
+        JavaScriptEditor(
+            initialCode = codePreference,
+            onRunClicked = { code, value, type ->
+                scope.launch {
+                    outputText = ""
+
+                    val result = jsEngine?.evaluateTemplate(
+                        code, value, type,
+                        onOutput = { message -> outputText += message + "\n" },
+                        onException = { throwable -> outputText += "Error: ${throwable.message ?: "Unknown error"}\n" }
+                    )
+
+                    outputText += when {
+                        result == null -> "JSEngine not initialized or unsupported! Make sure that you have enabled the feature."
+                        result.isEmpty() -> "Empty result (Make sure that your code has a string as the last statement)"
+                        else -> result
+                    }
+                }
+            },
+            onEdit = { codeText = it },
+            outputText = outputText,
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun JavaScriptEditor(
+    initialCode: String,
+    onRunClicked: (String, String, String) -> Unit,
+    onEdit: (String) -> Unit,
+    outputText: String
+) {
+    val codeState = rememberTextFieldState(initialCode)
+    var valueText by remember { mutableStateOf(TextFieldValue("")) }
+    var typeText by remember { mutableStateOf("") }
+
+    val currentOnRunClicked by rememberUpdatedState(onRunClicked)
+    val currentOnEdit by rememberUpdatedState(onEdit)
+
+    // Notify parent of text changes
+    LaunchedEffect(Unit) {
+        snapshotFlow { codeState.text.toString() }.collect { currentOnEdit(it) }
+    }
+
+    Column(Modifier.verticalScroll(rememberScrollState())) {
+        Text(stringResource(R.string.editor_desc))
+
+        Text(
+            stringResource(R.string.editor),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+
+        // JavaScript code editor with auto-complete assistance
+        TextField(
+            state = codeState,
+            inputTransformation = JsInputTransformation,
+            textStyle = TextStyle(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(200.dp)
+                .padding(bottom = 16.dp)
+        )
+
+        Text(stringResource(R.string.debug), style = MaterialTheme.typography.titleMedium)
+
+        // Input fields
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            TextField(
+                value = valueText,
+                onValueChange = { valueText = it },
+                modifier = Modifier
+                    .weight(0.5f)
+                    .padding(end = 8.dp),
+                placeholder = { Text(stringResource(R.string.code)) }
+            )
+
+            val options = stringArrayResource(R.array.code_types_values)
+            val filterOpts by remember {
+                derivedStateOf {
+                    options.filter {
+                        it.contains(
+                            typeText,
+                            ignoreCase = true
+                        )
+                    }
+                }
+            }
+
+            var exp by remember { mutableStateOf(false) }
+
+            ExposedDropdownMenuBox(
+                expanded = exp,
+                onExpandedChange = { exp = !exp },
+                modifier = Modifier.weight(0.5f)
+            ) {
+                TextField(
+                    value = typeText,
+                    onValueChange = { typeText = it },
+                    label = { Text(stringResource(R.string.format)) },
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = exp)
+                    },
+                    colors = ExposedDropdownMenuDefaults.textFieldColors(),
+                    modifier = Modifier.menuAnchor(
+                        ExposedDropdownMenuAnchorType.PrimaryEditable,
+                        true
+                    )
+                )
+                // filter options based on text field value (i.e. crude autocomplete)
+                if (filterOpts.isNotEmpty()) {
+                    ExposedDropdownMenu(expanded = exp, onDismissRequest = { exp = false }) {
+                        filterOpts.forEach { option ->
+                            DropdownMenuItem(
+                                text = { Text(text = option) },
+                                onClick = {
+                                    typeText = option
+                                    exp = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Run button
+        Button(
+            onClick = { currentOnRunClicked(codeState.text.toString(), valueText.text, typeText) },
+            modifier = Modifier
+                .align(Alignment.End)
+                .padding(top = 8.dp)
+        ) {
+            Text(stringResource(R.string.run))
+        }
+
+        Text(stringResource(R.string.output), style = MaterialTheme.typography.titleMedium)
+
+        // Output text
+        Card(Modifier.fillMaxWidth()) {
+            Text(outputText)
+        }
+    }
+}
+
+@Preview
+@Composable
+fun PreviewJavaScriptEditor() {
+    Surface {
+        JavaScriptEditor(
+            initialCode = "<code>",
+            onRunClicked = { _, _, _ -> },
+            onEdit = {},
+            outputText = "Output will appear here"
+        )
+    }
+}

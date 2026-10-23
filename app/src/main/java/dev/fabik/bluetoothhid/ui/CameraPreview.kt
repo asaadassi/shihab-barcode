@@ -1,0 +1,468 @@
+package dev.fabik.bluetoothhid.ui
+
+import android.app.Activity
+import android.content.Intent
+import android.os.Build
+import android.util.Log
+import android.util.Size
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.compose.CameraXViewfinder
+import androidx.camera.core.CameraControl
+import androidx.camera.core.CameraInfo
+import androidx.camera.core.ImageCapture
+import androidx.camera.viewfinder.compose.MutableCoordinateTransformer
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DocumentScanner
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.takeOrElse
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.round
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import dev.fabik.bluetoothhid.LocalJsEngineService
+import dev.fabik.bluetoothhid.R
+import dev.fabik.bluetoothhid.ui.model.BarcodeResult
+import dev.fabik.bluetoothhid.ui.model.CameraViewModel
+import dev.fabik.bluetoothhid.utils.ComposableLifecycle
+import dev.fabik.bluetoothhid.utils.PreferenceStore
+import dev.fabik.bluetoothhid.utils.getMultiPreferenceState
+import dev.fabik.bluetoothhid.utils.getPreferenceState
+import kotlinx.coroutines.launch
+import org.totschnig.ocr.Text
+import zxingcpp.BarcodeReader
+import kotlin.math.abs
+
+@Composable
+fun CameraPreviewContent(
+    viewModel: CameraViewModel = viewModel<CameraViewModel>(),
+    onCameraReady: (CameraControl?, CameraInfo?, ImageCapture?) -> Unit,
+    onBarcodeDetected: (BarcodeResult?) -> Unit,
+) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val configuration = LocalConfiguration.current
+
+    val scope = rememberCoroutineScope()
+    val errorDialog = rememberDialogState()
+
+    // Camera settings
+    val camera by context.getMultiPreferenceState(
+        PreferenceStore.FRONT_CAMERA,
+        PreferenceStore.SCAN_RESOLUTION,
+        PreferenceStore.FIX_EXPOSURE,
+        PreferenceStore.FOCUS_MODE,
+        PreferenceStore.PREVIEW_PERFORMANCE_MODE,
+        PreferenceStore.PREVIEW_STABILIZATION,
+        PreferenceStore.INITIAL_ZOOM
+    )
+
+    var isPaused by rememberSaveable { mutableStateOf(false) }
+
+    ComposableLifecycle(lifecycleOwner) { _, event ->
+        when (event) {
+            Lifecycle.Event.ON_RESUME -> isPaused = false
+            Lifecycle.Event.ON_PAUSE -> isPaused = true
+            else -> {}
+        }
+    }
+
+    if (!isPaused && camera != null) {
+        LaunchedEffect(configuration, lifecycleOwner, camera) {
+            runCatching {
+                camera?.let {
+                    viewModel.bindToCamera(
+                        context.applicationContext,
+                        lifecycleOwner,
+                        PreferenceStore.FRONT_CAMERA.extract(it),
+                        PreferenceStore.SCAN_RESOLUTION.extractEnum(it),
+                        PreferenceStore.FIX_EXPOSURE.extract(it),
+                        PreferenceStore.FOCUS_MODE.extractEnum(it),
+                        PreferenceStore.PREVIEW_PERFORMANCE_MODE.extract(it),
+                        PreferenceStore.PREVIEW_STABILIZATION.extract(it),
+                        PreferenceStore.INITIAL_ZOOM.extract(it),
+                        onCameraReady = onCameraReady,
+                        onBarcode = onBarcodeDetected,
+                    )
+                }
+            }.onFailure {
+                Log.e("CameraPreview", "Error binding camera!", it)
+                errorDialog.open()
+            }
+        }
+    }
+
+    CameraPreviewPreferences(viewModel)
+
+    val zoomGestures by context.getPreferenceState(PreferenceStore.ZOOM_GESTURES)
+    val pinchZoom = zoomGestures?.contains("0") == true
+    val swipeZoom = zoomGestures?.contains("1") == true
+    val doubleTap = zoomGestures?.contains("2") == true
+
+    val surfaceRequest by viewModel.surfaceRequest.collectAsStateWithLifecycle()
+    surfaceRequest?.let { request ->
+        var isFocusing by remember { mutableStateOf(false) }
+        var autofocusCoords by remember { mutableStateOf(Offset.Unspecified) }
+
+        val coordinateTransformer = remember { MutableCoordinateTransformer() }
+        val resources = LocalResources.current
+
+        CameraXViewfinder(surfaceRequest = request,
+            coordinateTransformer = coordinateTransformer,
+            modifier = Modifier
+                .pointerInput(viewModel, coordinateTransformer) {
+                    detectTapGestures(
+                        onDoubleTap = if (doubleTap) {
+                            { viewModel.resetZoom() }
+                        } else null) { tapCoords ->
+                        if (!isFocusing) {
+                            scope.launch {
+                                autofocusCoords = tapCoords
+                                isFocusing = true
+                                with(coordinateTransformer) {
+                                    viewModel.tapToFocus(tapCoords.transform())
+                                }
+                                isFocusing = false
+                            }
+                        }
+                    }
+                }
+                .then(
+                    if (pinchZoom || swipeZoom) Modifier.pointerInput(
+                        viewModel,
+                        pinchZoom,
+                        swipeZoom
+                    ) {
+                        val screenHeight = resources.displayMetrics.heightPixels
+                        val swipeThreshold = 4f * resources.displayMetrics.density
+                        awaitEachGesture {
+                            var isMultiTouch = false
+
+                            val first = awaitFirstDown(requireUnconsumed = false)
+                            val startY = first.position.y
+                            var prevY = startY
+                            var prevDist = 0f
+
+                            do {
+                                val event = awaitPointerEvent()
+                                val active = event.changes.filter { it.pressed }
+
+                                when {
+                                    active.size >= 2 && pinchZoom -> {
+                                        isMultiTouch = true
+                                        val dist =
+                                            (active[0].position - active[1].position).getDistance()
+                                        if (prevDist > 0f) viewModel.pinchToZoom(dist / prevDist)
+                                        prevDist = dist
+                                        event.changes.forEach { it.consume() }
+                                    }
+
+                                    active.size == 1 && swipeZoom && !isMultiTouch -> {
+                                        val dy = active[0].position.y - prevY
+                                        prevY = active[0].position.y
+                                        if (abs(prevY - startY) > swipeThreshold) {
+                                            viewModel.swipeToZoom(dy, screenHeight)
+                                            event.changes.forEach { it.consume() }
+                                        }
+                                    }
+                                }
+                            } while (event.changes.any { it.pressed })
+                        }
+                    } else Modifier
+                ))
+
+        OverlayCanvas(viewModel)
+
+        AnimatedVisibility(visible = isFocusing,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier
+                .offset {
+                    autofocusCoords
+                        .takeOrElse { Offset.Zero }
+                        .round()
+                }
+                .offset((-24).dp, (-24).dp)) {
+            Spacer(
+                Modifier
+                    .border(2.dp, Color.White, CircleShape)
+                    .size(48.dp)
+            )
+        }
+    }
+
+    OcrDetectionFAB(viewModel)
+
+    InfoDialog(dialogState = errorDialog, title = stringResource(R.string.camera_error), icon = {
+        Icon(
+            Icons.Filled.Error, null, tint = MaterialTheme.colorScheme.error
+        )
+    }) {
+        Text(stringResource(R.string.camera_error_desc))
+    }
+}
+
+@Composable
+fun CameraPreviewPreferences(viewModel: CameraViewModel) {
+    val context = LocalContext.current
+    val jsEngineService = LocalJsEngineService.current
+
+    // Scanner settings
+    val scanner by context.getMultiPreferenceState(
+        PreferenceStore.SCAN_FREQUENCY,
+        PreferenceStore.FULL_INSIDE,
+        PreferenceStore.SCAN_REGEX,
+        PreferenceStore.ENABLE_JS,
+        PreferenceStore.JS_CODE,
+        PreferenceStore.SAVE_SCAN,
+        PreferenceStore.SAVE_SCAN_PATH,
+        PreferenceStore.SAVE_SCAN_CROP_MODE,
+        PreferenceStore.SAVE_SCAN_QUALITY,
+        PreferenceStore.SAVE_SCAN_FILE_PATTERN,
+        PreferenceStore.CLEAR_AFTER_TIME,
+        PreferenceStore.SAVE_SCAN_IMAGE_FORMAT,
+        PreferenceStore.MULTI_CODE_DETECTION,
+        PreferenceStore.AUTO_SEND,
+        PreferenceStore.TEMPLATE_TEXT,
+        PreferenceStore.DIRECT_APPLY_TEMPLATE
+    )
+
+    scanner?.let {
+        LaunchedEffect(scanner, jsEngineService) {
+            val jsEnabled = PreferenceStore.ENABLE_JS.extract(it)
+            val jsCode = PreferenceStore.JS_CODE.extract(it)
+            val scanRegex = runCatching {
+                val regex = PreferenceStore.SCAN_REGEX.extract(it)
+                if (!regex.isBlank()) regex.toRegex() else null
+            }.getOrNull()
+            val saveScan = PreferenceStore.SAVE_SCAN.extract(it)
+            val saveScanPath = PreferenceStore.SAVE_SCAN_PATH.extract(it)
+            val directApplyTemplate = PreferenceStore.DIRECT_APPLY_TEMPLATE.extract(it)
+
+            viewModel.updateScanParameters(
+                PreferenceStore.FULL_INSIDE.extract(it),
+                scanRegex,
+                if (jsEnabled) jsCode else null,
+                PreferenceStore.SCAN_FREQUENCY.extractEnum(it),
+                jsEngineService,
+                if (saveScan && saveScanPath.isNotBlank()) saveScanPath else null,
+                PreferenceStore.SAVE_SCAN_CROP_MODE.extractEnum(it),
+                PreferenceStore.SAVE_SCAN_QUALITY.extract(it),
+                PreferenceStore.SAVE_SCAN_FILE_PATTERN.extract(it),
+                PreferenceStore.CLEAR_AFTER_TIME.extractEnum(it).value,
+                PreferenceStore.SAVE_SCAN_IMAGE_FORMAT.extractEnum(it),
+                PreferenceStore.MULTI_CODE_DETECTION.extract(it),
+                PreferenceStore.AUTO_SEND.extract(it),
+                if (directApplyTemplate) PreferenceStore.TEMPLATE_TEXT.extract(it) else null
+            )
+        }
+    }
+
+    // Barcode reader options
+    val reader by context.getMultiPreferenceState(
+        PreferenceStore.CODE_TYPES,
+        PreferenceStore.ADV_TRY_HARDER,
+        PreferenceStore.ADV_TRY_ROTATE,
+        PreferenceStore.ADV_TRY_INVERT,
+        PreferenceStore.ADV_TRY_DOWNSCALE,
+        PreferenceStore.ADV_TRY_DENOISE,
+        PreferenceStore.ADV_MIN_LINE_COUNT,
+        PreferenceStore.ADV_BINARIZER,
+        PreferenceStore.ADV_DOWNSCALE_FACTOR,
+        PreferenceStore.ADV_DOWNSCALE_THRESHOLD,
+        PreferenceStore.ADV_TEXT_MODE
+    )
+
+    reader?.let {
+        LaunchedEffect(reader) {
+            viewModel.updateBarcodeReaderOptions(
+                PreferenceStore.CODE_TYPES.extract(it),
+                PreferenceStore.ADV_TRY_HARDER.extract(it),
+                PreferenceStore.ADV_TRY_ROTATE.extract(it),
+                PreferenceStore.ADV_TRY_INVERT.extract(it),
+                PreferenceStore.ADV_TRY_DOWNSCALE.extract(it),
+                PreferenceStore.ADV_TRY_DENOISE.extract(it),
+                PreferenceStore.ADV_MIN_LINE_COUNT.extract(it),
+                PreferenceStore.ADV_BINARIZER.extractEnum(it),
+                PreferenceStore.ADV_DOWNSCALE_FACTOR.extract(it),
+                PreferenceStore.ADV_DOWNSCALE_THRESHOLD.extract(it),
+                PreferenceStore.ADV_TEXT_MODE.extractEnum(it),
+            )
+        }
+    }
+}
+
+@Composable
+private fun OcrDetectionFAB(viewModel: CameraViewModel) {
+    val context = LocalContext.current
+    val resultDialog = rememberDialogState()
+
+    var imageSize by remember { mutableStateOf(Size(0, 0)) }
+    val results by viewModel.ocrResults.collectAsStateWithLifecycle()
+    val triggerOcr by viewModel.triggerOcr.collectAsStateWithLifecycle()
+
+    val startForResult =
+        rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                // New API (API 33+) is used when available; deprecated fallback required for API < 33
+                @Suppress("DEPRECATION")
+                val text: Text? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    result.data?.getParcelableExtra("result", Text::class.java)
+                } else {
+                    result.data?.getParcelableExtra("result")
+                }
+
+                text?.let {
+                    if (viewModel.onOcrResult(it.textBlocks, imageSize)) {
+                        resultDialog.open()
+                    }
+                }
+            }
+        }
+
+    val ocrEnable by context.getPreferenceState(PreferenceStore.OCR_COMPAT)
+    if (!(ocrEnable ?: false))
+        return
+
+    val selectedTexts = remember { mutableStateMapOf<Int, String>() }
+
+    ConfirmDialog(
+        resultDialog, stringResource(R.string.scan_results), enabled = selectedTexts.isNotEmpty(),
+        onConfirm = {
+            viewModel.onBarcodeDetected(
+                selectedTexts.map { e -> e.value }.joinToString("\n"),
+                BarcodeReader.Format.NONE, null, emptyList()
+            )
+            close()
+        }
+    ) {
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            item {
+                Text(stringResource(R.string.ocr_results_selection))
+            }
+
+            itemsIndexed(results) { i, v ->
+                var editText by rememberSaveable { mutableStateOf(v.text) }
+                val checked = selectedTexts.contains(i)
+
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked,
+                        onCheckedChange = {
+                            if (checked) {
+                                selectedTexts.remove(i)
+                            } else {
+                                selectedTexts[i] = editText
+                            }
+                        },
+                        modifier = Modifier.padding(end = 2.dp)
+                    )
+                    TextField(
+                        value = editText,
+                        onValueChange = {
+                            editText = it
+                            if (selectedTexts.contains(i))
+                                selectedTexts[i] = it
+                        })
+                }
+            }
+        }
+    }
+
+    // For debugging use "android.intent.action.VIEW"
+    val intent = remember { Intent("org.totschnig.ocr.action.RECOGNIZE") }
+    Box(
+        Modifier
+            .fillMaxSize()
+            .safeDrawingPadding()
+    ) {
+        val scope = rememberCoroutineScope()
+
+        // Needed to trigger the detection as volume key action from Scanner
+        LaunchedEffect(triggerOcr) {
+            if (triggerOcr == null) return@LaunchedEffect
+
+            viewModel.captureImageOCR(context) { photoUri, size ->
+                imageSize = size
+
+                runCatching {
+                    Log.d("Scanner", "Launching intent with $photoUri $imageSize")
+                    startForResult.launch(intent.apply {
+                        setDataAndType(photoUri, "image/jpeg")
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    })
+                }.onFailure {
+                    scope.launch {
+                        Toast.makeText(
+                            context,
+                            "OCR engine not installed!",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                    Log.e("Scanner", "Unable start intent!", it)
+                }
+            }
+        }
+
+        FloatingActionButton(
+            onClick = { viewModel.triggerOcr() },
+            modifier = Modifier
+                .padding(16.dp)
+                .align(Alignment.BottomEnd)
+        ) {
+            Icon(Icons.Default.DocumentScanner, null)
+        }
+    }
+}

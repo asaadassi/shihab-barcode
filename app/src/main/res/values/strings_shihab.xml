@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Barcode by Shihab App: texts added to HID Barcode Scanner (kept apart from the upstream strings.xml). -->
+<resources>
+    <string name="shihab_product_description">Bluetooth scanner</string>
+    <string name="shihab_signature">Barcode by Shihab App</string>
+    <string name="shihab_about">About Barcode</string>
+    <string name="shihab_language">Language</string>
+    <string name="shihab_close">Close</string>
+    <string name="shihab_later">Later</string>
+    <string name="shihab_source_code">Source code</string>
+    <string name="shihab_source_desc">Based on HID Barcode Scanner by Fabi019, free software under GPL-3.0</string>
+    <string name="shihab_license_title">Licence (GPL-3.0)</string>
+    <string name="shihab_license_notice">Barcode is a modified version of HID Barcode Scanner %1$s, Copyright (C) Fabian Kurz (Fabi019) and contributors, changed by Shihab App in 2026.\n\nThis program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY. Its full source code is available from the source code link below.</string>
+    <string name="shihab_update_check">Check for updates</string>
+    <string name="shihab_update_check_desc">Download the newest version from Shihab App</string>
+    <string name="shihab_update_checking">Checking…</string>
+    <string name="shihab_update_downloading">Downloading %1$d%%</string>
+    <string name="shihab_update_up_to_date">You have the latest version.</string>
+    <string name="shihab_update_none">No version has been published yet.</string>
+    <string name="shihab_update_available">Version %1$s is available</string>
+    <string name="shihab_update_install">Update</string>
+    <string name="shihab_report_desc">Email Shihab App support with the app version and error log</string>
+    <string name="shihab_report_subject">Barcode %1$s: problem report</string>
+    <string name="shihab_report_body_hint">Describe the problem here:</string>
+</resources>

@@ -1,0 +1,1334 @@
+package dev.fabik.bluetoothhid
+
+import app.shihab.shared.locale.ShihabDigits
+import android.annotation.SuppressLint
+import android.bluetooth.BluetoothDevice
+import android.content.ClipData
+import android.content.Context
+import android.media.AudioManager
+import android.media.ToneGenerator
+import android.os.Build
+import android.os.VibrationAttributes
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
+import android.util.Log
+import android.view.KeyEvent
+import android.widget.Toast
+import androidx.activity.compose.LocalActivity
+import androidx.camera.core.CameraControl
+import androidx.camera.core.CameraInfo
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.TorchState
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
+import androidx.compose.foundation.layout.windowInsetsTopHeight
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.text.input.selectAll
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.FlashOff
+import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Keyboard
+import androidx.compose.material.icons.rounded.Warning
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FabPosition
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.SuggestionChip
+import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.ParagraphStyle
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import dev.fabik.bluetoothhid.bt.ExternalProtocol
+import dev.fabik.bluetoothhid.bt.KeyTranslator
+import dev.fabik.bluetoothhid.ui.CameraPreviewContent
+import dev.fabik.bluetoothhid.ui.ConfirmDialog
+import dev.fabik.bluetoothhid.ui.DialogState
+import dev.fabik.bluetoothhid.ui.Dropdown
+import dev.fabik.bluetoothhid.ui.InfoDialog
+import dev.fabik.bluetoothhid.ui.LocalNavigation
+import dev.fabik.bluetoothhid.ui.RequiresCameraPermission
+import dev.fabik.bluetoothhid.ui.Routes
+import dev.fabik.bluetoothhid.ui.model.BarcodeResult
+import dev.fabik.bluetoothhid.ui.model.CameraViewModel
+import dev.fabik.bluetoothhid.ui.model.CameraViewModel.Barcode
+import dev.fabik.bluetoothhid.ui.rememberDialogState
+import dev.fabik.bluetoothhid.ui.tooltip
+import dev.fabik.bluetoothhid.utils.ConnectionMode
+import dev.fabik.bluetoothhid.utils.DeviceInfo
+import dev.fabik.bluetoothhid.utils.OverlayType
+import dev.fabik.bluetoothhid.utils.PreferenceStore
+import dev.fabik.bluetoothhid.utils.ScanAreaData
+import dev.fabik.bluetoothhid.utils.VolumeKeyAction
+import dev.fabik.bluetoothhid.utils.getPreferenceState
+import dev.fabik.bluetoothhid.utils.getPreferenceStateBlocking
+import dev.fabik.bluetoothhid.utils.getPreferenceStateDefault
+import dev.fabik.bluetoothhid.utils.setPreference
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.math.abs
+
+// Grace period after entering the scanner before a silent external plugin is shown as "not responding".
+private const val EXTERNAL_INIT_GRACE_MS = 6_000L
+
+/**
+ * Helper function to create a circular background modifier for icons in fullscreen mode.
+ * Provides better visibility by adding a semi-transparent black circle behind the icon.
+ */
+private fun Modifier.iconBackgroundModifier(): Modifier {
+    return drawBehind {
+        drawCircle(
+            color = Color.Black.copy(alpha = 0.5f),
+            radius = size.maxDimension
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ElevatedWarningCard(
+    message: String,
+    subMessage: String? = null,
+    onClick: () -> Unit,
+    onDismiss: (() -> Unit)? = null,
+    visible: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val scope = rememberCoroutineScope()
+
+    val dismissState = rememberSwipeToDismissBoxState()
+
+    LaunchedEffect(dismissState.currentValue) {
+        if (dismissState.currentValue != SwipeToDismissBoxValue.Settled) {
+            onDismiss?.invoke()
+        }
+    }
+
+    AnimatedVisibility(
+        visible = visible, // You will control visibility dynamically
+        modifier = modifier
+    ) {
+        SwipeToDismissBox(
+            state = dismissState,
+            backgroundContent = {},
+            enableDismissFromStartToEnd = onDismiss != null,
+            enableDismissFromEndToStart = onDismiss != null,
+        ) {
+            ElevatedCard(
+                onClick = { scope.launch { onClick() } }
+            ) {
+                Row(
+                    Modifier.padding(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Rounded.Warning, contentDescription = "Warning")
+                    Column {
+                        Text(message)
+                        subMessage?.let {
+                            Text(it, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Scanner screen with camera preview.
+ *
+ * @param currentDevice the device that is currently connected, can be null if no device is connected
+ * @param sendText callback to send the scanned barcode result to the current device
+ */
+@Composable
+fun Scanner(
+    currentDevice: BluetoothDevice?,
+    sendText: (BarcodeResult) -> Unit
+) {
+    val context = LocalContext.current
+    val resources = LocalResources.current
+
+    var currentResult by remember { mutableStateOf<BarcodeResult?>(null) }
+
+    val currentSendText = remember(currentResult) {
+        { -> currentResult?.let { sendText(it) } }
+    }
+
+    var cameraControl by remember { mutableStateOf<CameraControl?>(null) }
+    var cameraInfo by remember { mutableStateOf<CameraInfo?>(null) }
+
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    val fullScreen by context.getPreferenceStateBlocking(PreferenceStore.SCANNER_FULL_SCREEN)
+    AdaptSystemBarsColor(fullScreen)
+
+    val restrictArea by context.getPreferenceStateBlocking(PreferenceStore.RESTRICT_AREA)
+    val overlayTypeOrdinal by context.getPreferenceStateBlocking(PreferenceStore.OVERLAY_TYPE)
+    val overlayType = OverlayType.fromIndex(overlayTypeOrdinal)
+
+    val keyboardDialog = rememberDialogState()
+    val cameraVM = viewModel<CameraViewModel>()
+    val scope = rememberCoroutineScope()
+
+    val errorDialog = rememberDialogState()
+    var lastError by remember { mutableStateOf<Throwable?>(null) }
+    lastError?.let {
+        ErrorDetailsDialog(errorDialog, it)
+    }
+
+    LaunchedEffect(cameraVM) {
+        cameraVM.errors.collect { error ->
+            if (error == null) return@collect
+            val result = snackbarHostState.showSnackbar(
+                message = resources.getString(error.template, error.error),
+                withDismissAction = true,
+                actionLabel = "View"
+            )
+
+            if (result == SnackbarResult.ActionPerformed) {
+                lastError = error.throwable
+                errorDialog.open()
+            }
+        }
+    }
+
+
+    // Surface external-output delivery status reported back by extensions (sent/failed).
+    // A Snackbar on the scanner sits clear of the Send button (unlike a Toast).
+    // The flow value is already fully formatted ("Plugin TCP: <detail>" — attribution added in
+    // ExternalController), so no extra wrapper here: a second prefix just made it noisy.
+    val controller = LocalController.current
+    LaunchedEffect(controller) {
+        controller?.externalLastResultFlow?.collect { result ->
+            snackbarHostState.showSnackbar(
+                message = result,
+                duration = SnackbarDuration.Short
+            )
+        }
+    }
+
+    // Entering the scanner kicks enabled plugins right away (SET_ENABLED + ping) so a down transport
+    // starts immediately instead of waiting for the next heartbeat — the readiness card below then
+    // shows "waiting → not responding → active" as their status comes back.
+    LaunchedEffect(controller) {
+        controller?.warmUpExternalPlugins()
+    }
+
+    Scaffold(
+        topBar = {
+            val onAddArea: (() -> Unit)? = if (restrictArea && overlayType == OverlayType.CUSTOM) {
+                {
+                    cameraVM.addScanAreas(ScanAreaData(0f, 0f, 100f, 100f))
+                    scope.launch {
+                        context.setPreference(
+                            PreferenceStore.SCAN_AREAS,
+                            ScanAreaData.toJsonArray(cameraVM.areas.value)
+                        )
+                    }
+                }
+            } else null
+            ScannerAppBar(cameraControl, cameraInfo, currentDevice, fullScreen, keyboardDialog, onAddArea)
+        },
+        floatingActionButtonPosition = FabPosition.Center,
+        floatingActionButton = {
+            val connectionMode by context.getPreferenceState(PreferenceStore.CONNECTION_MODE)
+            val isExternal = connectionMode == ConnectionMode.EXTERNAL.ordinal
+            // External has no Bluetooth device but still needs a manual send button
+            if (currentDevice != null || isExternal) {
+                val clearAfterSend by context.getPreferenceState(PreferenceStore.CLEAR_AFTER_SEND)
+
+                currentResult?.let {
+                    SendToDeviceFAB {
+                        currentSendText()
+
+                        if (clearAfterSend == true) {
+                            currentResult = null
+                            cameraVM.lastBarcode = null
+                        }
+                    }
+                }
+            }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+    ) { padding ->
+        Box(
+            Modifier
+                .padding(if (fullScreen) PaddingValues(0.dp) else padding)
+                .fillMaxSize()
+        ) {
+            RequiresCameraPermission {
+                CameraPreviewArea(onCameraReady = { control, info, capt ->
+                    cameraControl = control; cameraInfo = info
+                }) { result, send ->
+                    currentResult = result
+                    if (send && result?.text?.isNotEmpty() == true) {
+                        currentSendText()
+                    }
+                }
+            }
+
+            val volumeActionUp by context.getPreferenceState(PreferenceStore.VOLUME_ACTION_UP)
+            val volumeActionDown by context.getPreferenceState(PreferenceStore.VOLUME_ACTION_DOWN)
+            val volumeZoom by context.getPreferenceState(PreferenceStore.VOLUME_ZOOM_LEVEL)
+
+            VolumeKeyHandler {
+                val value =
+                    if (it == KeyEvent.KEYCODE_VOLUME_UP) volumeActionUp else volumeActionDown
+                val action = VolumeKeyAction.fromIndex(value ?: return@VolumeKeyHandler false)
+                when (action) {
+                    VolumeKeyAction.NOTHING -> return@VolumeKeyHandler false
+                    VolumeKeyAction.SEND_VALUE -> currentSendText()
+                    VolumeKeyAction.TOGGLE_ZOOM -> {
+                        val targetZoom = minOf((volumeZoom ?: 100f) / 100f, 1.0f)
+                        if (abs(
+                                cameraInfo?.zoomState?.value?.linearZoom?.minus(targetZoom) ?: 1.0f
+                            ) > 0.1f
+                        )
+                            cameraControl?.setLinearZoom(targetZoom)
+                        else
+                            cameraControl?.setZoomRatio(1.0f)
+                    }
+
+                    VolumeKeyAction.OPEN_KEYBOARD -> keyboardDialog.open()
+                    VolumeKeyAction.TOGGLE_FLASH -> cameraControl?.enableTorch(cameraInfo?.torchState?.value == TorchState.OFF)
+                    VolumeKeyAction.TRIGGER_FOCUS -> cameraVM.focusAtCenter()
+                    VolumeKeyAction.CLEAR_VALUE -> {
+                        currentResult = null
+                        cameraVM.lastBarcode = null
+                    }
+
+                    VolumeKeyAction.RUN_OCR -> cameraVM.triggerOcr()
+                }
+                return@VolumeKeyHandler true
+            }
+
+            // Gradients for better system bars visibility in fullscreen mode
+            if (fullScreen) {
+                // Gradient at top (under status bar) - more concentrated
+                Box(
+                    Modifier
+                        .windowInsetsTopHeight(WindowInsets.statusBars)
+                        .fillMaxWidth()
+                        .align(Alignment.TopCenter)
+                        .background(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Black.copy(alpha = 0.85f),
+                                    Color.Black.copy(alpha = 0.6f),
+                                    Color.Transparent
+                                )
+                            )
+                        )
+                )
+
+                // Gradient at bottom (under navigation bar)
+                Box(
+                    Modifier
+                        .windowInsetsBottomHeight(WindowInsets.navigationBars)
+                        .fillMaxWidth()
+                        .align(Alignment.BottomCenter)
+                        .background(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    Color.Black.copy(alpha = 0.6f),
+                                    Color.Black.copy(alpha = 0.85f)
+                                )
+                            )
+                        )
+                )
+            }
+        }
+
+        Box(
+            Modifier
+                .padding(padding)
+                .fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+
+            BarcodeValue(currentResult?.text)
+
+            // Warning cards share one top-center column so they stack instead of overlapping.
+            Column(
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CapsLockWarning()
+                DeviceStatusIndicator()
+                ExternalPluginIndicator()
+            }
+
+            cameraInfo?.let {
+                ZoomStateInfo(it)
+            }
+            KeepScreenOn()
+
+            // Multi-code picker: visible when multi-code detection is on but auto-send is off
+            val multiCodeDetection by context.getPreferenceState(PreferenceStore.MULTI_CODE_DETECTION)
+            val autoSend by context.getPreferenceState(PreferenceStore.AUTO_SEND)
+            if (multiCodeDetection == true && autoSend != true) {
+                val detectedBarcodes by cameraVM.detectedBarcodes.collectAsStateWithLifecycle()
+                if (detectedBarcodes.isNotEmpty()) {
+                    MultiCodePicker(
+                        barcodes = detectedBarcodes,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 80.dp),
+                        onSelect = { cameraVM.selectBarcode(it) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MultiCodePicker(
+    barcodes: List<Barcode>,
+    modifier: Modifier = Modifier,
+    onSelect: (Barcode) -> Unit
+) {
+    LazyRow(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(Color.Black.copy(alpha = 0.6f))
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(barcodes) { barcode ->
+            SuggestionChip(
+                onClick = { onSelect(barcode) },
+                label = {
+                    Text(
+                        text = barcode.value?.take(24) ?: "?",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            )
+        }
+    }
+}
+
+@Composable
+fun AdaptSystemBarsColor(fullScreen: Boolean) {
+    // Calculate light theme the same way MainActivity does
+    val colorScheme = MaterialTheme.colorScheme
+    val isLightTheme = colorScheme.background.luminance() > 0.5f
+    val activity = LocalActivity.current
+    val view = LocalView.current
+
+    // Manage system bars appearance only in fullscreen mode
+    // In non-fullscreen mode, MainActivity handles system bars based on theme
+    // Use isLightTheme as key to react to theme changes
+    DisposableEffect(fullScreen, isLightTheme) {
+        val insetsController = activity?.window?.let { WindowCompat.getInsetsController(it, view) }
+
+        if (fullScreen && insetsController != null) {
+            // In fullscreen mode, use white icons for better visibility on camera background
+            insetsController.isAppearanceLightStatusBars = false
+            insetsController.isAppearanceLightNavigationBars = false
+
+            onDispose {
+                // Restore proper system bars appearance based on current theme
+                insetsController.isAppearanceLightStatusBars = isLightTheme
+                insetsController.isAppearanceLightNavigationBars = isLightTheme
+            }
+        } else {
+            onDispose { }
+        }
+    }
+}
+
+/**
+ * Area for the camera preview.
+ *
+ * @param onCameraReady callback to be called when the camera is ready
+ * @param onBarcodeDetected callback invoked when a barcode is detected (result, autoSend).
+ *   A null result means the barcode left the frame.
+ */
+@Composable
+private fun CameraPreviewArea(
+    onCameraReady: (CameraControl?, CameraInfo?, ImageCapture?) -> Unit,
+    onBarcodeDetected: (BarcodeResult?, Boolean) -> Unit,
+) {
+    val context = LocalContext.current
+
+    val vibrator = remember {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val manager =
+                context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+            manager.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+        }
+    }
+
+    val playSound by context.getPreferenceStateDefault(PreferenceStore.PLAY_SOUND)
+
+    var toneGenerator = remember {
+        runCatching {
+            ToneGenerator(AudioManager.STREAM_MUSIC, ToneGenerator.MAX_VOLUME)
+        }.onFailure {
+            Log.e("Scanner", "Error initializing tone generator", it)
+            Toast.makeText(context, "Error initializing tone generator", Toast.LENGTH_SHORT).show()
+        }.getOrNull()
+    }
+
+    // Clean up tone generator after use
+    DisposableEffect(toneGenerator) {
+        onDispose {
+            toneGenerator?.release()
+            toneGenerator = null
+        }
+    }
+
+    val autoSend by context.getPreferenceStateDefault(PreferenceStore.AUTO_SEND)
+    val vibrate by context.getPreferenceStateDefault(PreferenceStore.VIBRATE)
+    val copyToClipboard by context.getPreferenceStateDefault(PreferenceStore.AUTO_COPY_TO_CLIPBOARD)
+    val clipboard = LocalClipboard.current
+    val clipboardScope = rememberCoroutineScope()
+
+    Log.d(
+        "Scanner",
+        "Scanner initialized - vibrate: $vibrate, hasVibrator: ${vibrator.hasVibrator()}, SDK: ${Build.VERSION.SDK_INT}"
+    )
+
+    CameraPreviewContent(onCameraReady = onCameraReady) { result ->
+        Log.d("Scanner", "Barcode detected: ${result?.text}")
+        onBarcodeDetected(result, result != null && autoSend)
+        if (result == null) return@CameraPreviewContent
+
+        if (playSound) {
+            runCatching {
+                toneGenerator?.startTone(ToneGenerator.TONE_PROP_ACK, 75)
+            }.onFailure {
+                Log.e("Scanner", "Failed to start tone with tone generator", it)
+            }
+        }
+
+        if (vibrate && vibrator.hasVibrator()) {
+            runCatching {
+                val effect = VibrationEffect.createOneShot(75, VibrationEffect.DEFAULT_AMPLITUDE)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    // Use USAGE_NOTIFICATION instead of USAGE_TOUCH to bypass system
+                    // "Haptic feedback" setting. USAGE_TOUCH respects that setting and may
+                    // not vibrate if user disabled haptic feedback in system settings.
+                    // USAGE_NOTIFICATION is for notifications and ignores haptic Android settings.
+                    val attributes = VibrationAttributes.Builder()
+                        .setUsage(VibrationAttributes.USAGE_NOTIFICATION)
+                        .build()
+                    vibrator.vibrate(effect, attributes)
+                    Log.d("Scanner", "Vibration triggered (new API - USAGE_NOTIFICATION)")
+                } else {
+                    vibrator.vibrate(effect)
+                    Log.d("Scanner", "Vibration triggered (old API)")
+                }
+            }.onFailure {
+                Log.w("Scanner", "Vibration failed", it)
+            }
+        }
+
+        if (copyToClipboard) {
+            clipboardScope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("", result.text))) }
+        }
+    }
+}
+
+/**
+ * Text showing the current barcode value. If the value is null, a generic message is shown instead.
+ *
+ * @param currentBarcode the current barcode value
+ */
+@Composable
+private fun BoxScope.BarcodeValue(currentBarcode: String?) {
+    val context = LocalContext.current
+    val clipboard = LocalClipboard.current
+    val clipboardScope = rememberCoroutineScope()
+    val privateMode by context.getPreferenceStateDefault(PreferenceStore.PRIVATE_MODE)
+
+    Column(
+        Modifier
+            .fillMaxHeight(0.3f)
+            .fillMaxWidth()
+            .align(Alignment.TopStart)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        val copiedString = stringResource(R.string.copied_to_clipboard)
+        var hideText by remember(privateMode, currentBarcode) {
+            mutableStateOf(privateMode)
+        }
+
+        // Strong shadow for better visibility on any background
+        val textShadow = Shadow(
+            color = Color.Black,
+            offset = Offset(0f, 0f),
+            blurRadius = 8f
+        )
+
+        currentBarcode?.let {
+            val text = AnnotatedString(
+                if (hideText) "*".repeat(it.length) else it,
+                SpanStyle(
+                    color = Color.White,
+                    shadow = textShadow,
+                    fontSize = 18.sp
+                ),
+                ParagraphStyle(TextAlign.Center)
+            )
+
+            Text(
+                text,
+                maxLines = 6,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.clickable {
+                    if (privateMode) {
+                        hideText = !hideText
+                    } else {
+                        clipboardScope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("", currentBarcode))) }
+                        Toast.makeText(context, copiedString, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            )
+        } ?: run {
+            Text(
+                stringResource(R.string.scan_code_to_start),
+                color = Color.White,
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    shadow = textShadow
+                )
+            )
+        }
+    }
+}
+
+/**
+ * Registers a KeyEventListener to capture volume up/down button presses.
+ * adapted from: https://stackoverflow.com/a/77875685
+ *
+ * @param onPress called when the user presses vol up/down
+ */
+@Composable
+private fun VolumeKeyHandler(onPress: (Int) -> Boolean) {
+    val context = LocalContext.current
+    val sendWithVolume by context.getPreferenceState(PreferenceStore.SEND_WITH_VOLUME)
+    val triggerOnRelease by context.getPreferenceState(PreferenceStore.VOLUME_ON_RELEASE)
+
+    if (sendWithVolume == true) {
+        val view = LocalView.current
+
+        DisposableEffect(context) {
+            val keyEventDispatcher = ViewCompat.OnUnhandledKeyEventListenerCompat { _, event ->
+                if (event.keyCode == KeyEvent.KEYCODE_VOLUME_UP || event.keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+                    if (event.repeatCount == 0
+                        && (event.action == KeyEvent.ACTION_UP && triggerOnRelease == true
+                                || event.action == KeyEvent.ACTION_DOWN && triggerOnRelease == false)
+                    )
+                        return@OnUnhandledKeyEventListenerCompat onPress(event.keyCode)
+                    return@OnUnhandledKeyEventListenerCompat true
+                }
+                false
+            }
+
+            ViewCompat.addOnUnhandledKeyEventListener(view, keyEventDispatcher)
+
+            onDispose {
+                ViewCompat.removeOnUnhandledKeyEventListener(view, keyEventDispatcher)
+            }
+        }
+    }
+}
+
+/**
+ * Floating action button area to send the current barcode to the connected device.
+ *
+ * - Normal state: Send FAB. If [enableUndoSend] is enabled and there is a last sent value,
+ *   a small Undo button is shown to the left of the Send FAB.
+ * - Sending state: Cancel FAB that stops the current transmission.
+ *
+ * @param onClick callback to send text to the current device
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SendToDeviceFAB(onClick: () -> Unit) {
+    val controller = LocalController.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    controller?.let {
+        val isSending by controller.isSending.collectAsStateWithLifecycle()
+        val lastSentCharCount by controller.lastSentCharCount.collectAsStateWithLifecycle()
+        val enableUndoSend by context.getPreferenceStateDefault(PreferenceStore.ENABLE_UNDO_SEND)
+        val connectionMode by context.getPreferenceState(PreferenceStore.CONNECTION_MODE)
+        val isHidMode = connectionMode != ConnectionMode.RFCOMM.ordinal
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Undo button: HID mode only — visible when undo is enabled and a completed send exists
+            if (isHidMode && !isSending && enableUndoSend && lastSentCharCount != null) {
+                SmallFloatingActionButton(
+                    onClick = { scope.launch { controller.undoLastSent() } },
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Undo, stringResource(R.string.undo_last_sent))
+                }
+            }
+
+            if (isHidMode && isSending) {
+                // Cancel button: HID mode only — stops the current transmission
+                ExtendedFloatingActionButton(
+                    text = { Text(stringResource(R.string.cancel)) },
+                    icon = { Icon(Icons.Default.Close, stringResource(R.string.cancel)) },
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    onClick = { controller.cancelSending() }
+                )
+            } else {
+                ExtendedFloatingActionButton(
+                    text = { Text(stringResource(R.string.send_to_device)) },
+                    icon = { Icon(Icons.AutoMirrored.Filled.Send, "Send") },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    onClick = onClick
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Scanner app bar with a toggle flash button and a disconnect button.
+ *
+ * @param camera the camera to toggle the flash on
+ * @param info the camera info for getting the flash state
+ * @param currentDevice the device that is currently connected, can be null if no device is connected
+ * @param transparent whether the app bar should be transparent or not
+ */
+@SuppressLint("MissingPermission")
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun ScannerAppBar(
+    camera: CameraControl?,
+    info: CameraInfo?,
+    currentDevice: BluetoothDevice?,
+    transparent: Boolean,
+    keyboardDialog: DialogState,
+    onAddArea: (() -> Unit)?
+) {
+    val navigation = LocalNavigation.current
+    val context = LocalContext.current
+    val connectionMode by context.getPreferenceState(PreferenceStore.CONNECTION_MODE)
+    val isExternal = connectionMode == ConnectionMode.EXTERNAL.ordinal
+
+    // Shadow for text in fullscreen mode
+    val textShadow = Shadow(
+        color = Color.Black,
+        offset = Offset(0f, 0f),
+        blurRadius = 8f
+    )
+
+    TopAppBar(
+        title = {
+            Column {
+                Text(
+                    stringResource(R.string.scanner),
+                    style = if (transparent) {
+                        MaterialTheme.typography.titleLarge.copy(
+                            color = Color.White,
+                            shadow = textShadow
+                        )
+                    } else {
+                        MaterialTheme.typography.titleLarge
+                    }
+                )
+                currentDevice?.let {
+                    Text(
+                        stringResource(R.string.connected_with, it.name ?: it.address),
+                        style = if (transparent) {
+                            MaterialTheme.typography.bodySmall.copy(
+                                color = Color.White,
+                                shadow = textShadow
+                            )
+                        } else {
+                            MaterialTheme.typography.bodySmall
+                        }
+                    )
+                }
+            }
+        },
+        actions = {
+            if (camera != null && info != null && info.hasFlashUnit()) {
+                ToggleFlashButton(camera, info, transparent)
+            }
+
+            if (currentDevice != null || isExternal) {
+                IconButton(onClick = {
+                    keyboardDialog.open()
+                }, Modifier.tooltip(stringResource(R.string.manual_input))) {
+                    Icon(
+                        Icons.Default.Keyboard,
+                        "Keyboard",
+                        tint = if (transparent) Color.White else MaterialTheme.colorScheme.onSurface,
+                        modifier = if (transparent) Modifier.iconBackgroundModifier() else Modifier
+                    )
+                }
+                KeyboardInputDialog(keyboardDialog)
+            }
+
+            IconButton(onClick = {
+                navigation.navigate(Routes.History)
+            }, Modifier.tooltip(stringResource(R.string.history))) {
+                Icon(
+                    Icons.Default.History,
+                    "History",
+                    tint = if (transparent) Color.White else MaterialTheme.colorScheme.onSurface,
+                    modifier = if (transparent) Modifier.iconBackgroundModifier() else Modifier
+                )
+            }
+//            IconButton(onDisconnect, Modifier.tooltip(stringResource(R.string.disconnect))) {
+//                Icon(Icons.Default.BluetoothDisabled, "Disconnect")
+//            }
+            Dropdown(transparent) { hideMenu ->
+                if (onAddArea != null) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.add_scan_area)) },
+                        leadingIcon = { Icon(Icons.Default.Add, null) },
+                        onClick = {
+                            onAddArea()
+                            hideMenu()
+                        }
+                    )
+                }
+            }
+        },
+        colors = if (transparent) {
+            TopAppBarDefaults.topAppBarColors(
+                containerColor = Color.Transparent,
+                titleContentColor = Color.White,
+                actionIconContentColor = Color.White
+            )
+        } else {
+            TopAppBarDefaults.topAppBarColors()
+        },
+    )
+}
+
+/**
+ * Toggle flash button to toggle the flash on the camera.
+ *
+ * @param camera the camera to toggle the flash on
+ * @param transparent whether to use transparent mode styling
+ */
+@Composable
+fun ToggleFlashButton(camera: CameraControl?, info: CameraInfo, transparent: Boolean = false) {
+    val torchState by info.torchState.observeAsState()
+
+    IconButton(
+        onClick = {
+            camera?.enableTorch(
+                when (torchState) {
+                    TorchState.OFF -> true
+                    else -> false
+                }
+            )
+        },
+        modifier = Modifier.tooltip(stringResource(R.string.toggle_flash))
+    ) {
+        Icon(
+            when (torchState) {
+                TorchState.OFF -> Icons.Default.FlashOn
+                else -> Icons.Default.FlashOff
+            },
+            "Flash",
+            tint = if (transparent) Color.White else MaterialTheme.colorScheme.onSurface,
+            modifier = if (transparent) Modifier.iconBackgroundModifier() else Modifier
+        )
+    }
+}
+
+/**
+ * Component that warns the user if the caps lock key is activated.
+ * Clicking on the card will send a caps lock key press to the
+ * connected device and disables it.
+ */
+@Composable
+fun CapsLockWarning() {
+    val controller = LocalController.current
+    val scope = rememberCoroutineScope()
+
+    controller?.let {
+        val isCaps by controller.isCapsLockOn.collectAsStateWithLifecycle()
+
+        // Only show Caps Lock warning when we have an active HID connection
+        // keyboardSender is only available when HID device is connected
+        val shouldShowWarning = isCaps && (controller.keyboardSender != null)
+
+        ElevatedWarningCard(
+            message = stringResource(R.string.caps_lock_activated),
+            subMessage = stringResource(R.string.click_to_turn_off),
+            onClick = {
+                scope.launch {
+                    controller.keyboardSender?.sendKey(KeyTranslator.CAPS_LOCK_KEY)
+                }
+            },
+            visible = shouldShowWarning
+        )
+    }
+}
+
+/**
+ * Component that shows device connection status for both HID and RFCOMM modes.
+ * Priority: if no device selected (currentDevice == null) => always show "No device connected"
+ * Otherwise in RFCOMM mode: show "Listening for connection from [ device ] when server is listening"
+ */
+@Composable
+fun DeviceStatusIndicator() {
+    val controller = LocalController.current
+    val context = LocalContext.current
+    val navigation = LocalNavigation.current
+
+    controller?.let {
+        val currentDevice by controller.currentDevice.collectAsStateWithLifecycle()
+        val connectionMode by context.getPreferenceState(PreferenceStore.CONNECTION_MODE)
+        val isRFCOMMListening by controller.isRFCOMMListeningFlow.collectAsStateWithLifecycle()
+        val isExternal = connectionMode == ConnectionMode.EXTERNAL.ordinal
+
+        var dismissed by rememberSaveable { mutableStateOf(false) }
+
+        when {
+            // External mode has no Bluetooth device — plugin readiness is shown by
+            // ExternalPluginIndicator instead, so suppress the "No device" card here.
+            isExternal -> Unit
+
+            currentDevice == null -> {
+                // No device selected - show "No device connected" regardless of mode
+                ElevatedWarningCard(
+                    message = stringResource(R.string.no_device),
+                    subMessage = stringResource(R.string.click_to_connect),
+                    onClick = {
+                        navigation.navigateUp()
+                    },
+                    onDismiss = { dismissed = true },
+                    visible = !dismissed
+                )
+            }
+
+            connectionMode == ConnectionMode.RFCOMM.ordinal && isRFCOMMListening -> {
+                // RFCOMM mode with device selected and server listening
+                ElevatedWarningCard(
+                    message = stringResource(R.string.rfcomm_listening),
+                    subMessage = stringResource(
+                        R.string.rfcomm_listening_from_device,
+                        currentDevice?.name ?: currentDevice?.address ?: ""
+                    ),
+                    onClick = {
+                        // Do nothing - this is just an informational message
+                        // User has already selected a device and server is listening
+                    },
+                    onDismiss = { dismissed = true },
+                    visible = !dismissed
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Plugin-readiness card for external output. Shown both in EXTERNAL mode (where it's the primary
+ * status) and when external output is enabled in parallel with HID/RFCOMM (hybrid). It's placed in
+ * the shared warning-card column, so it stacks cleanly below the device card without overlapping.
+ *
+ * States: no plugin enabled → waiting (within grace) → not responding (tap to retry) → active.
+ */
+@Composable
+fun ExternalPluginIndicator() {
+    val controller = LocalController.current ?: return
+    val context = LocalContext.current
+
+    val connectionMode by context.getPreferenceState(PreferenceStore.CONNECTION_MODE)
+    val isExternal = connectionMode == ConnectionMode.EXTERNAL.ordinal
+    val externalOutputEnabled by context.getPreferenceState(PreferenceStore.ENABLE_EXTERNAL_OUTPUT)
+    // Only engaged as the sole mode (EXTERNAL) or in parallel with HID/RFCOMM (the toggle).
+    if (!isExternal && externalOutputEnabled != true) return
+
+    val isExternalActive by controller.externalActiveFlow.collectAsStateWithLifecycle()
+    val enabledPlugins by context.getPreferenceState(PreferenceStore.ENABLED_EXTERNAL_PLUGINS)
+    // "Enabled" is just stored package names — intersect with what's actually installed so a stale
+    // entry (plugin uninstalled while still enabled) doesn't masquerade as "waiting for a plugin".
+    val installed = remember { ExternalProtocol.discover(context).map { it.packageName }.toSet() }
+    val enabled = (enabledPlugins ?: emptySet()) intersect installed
+    val pluginHealth by controller.externalPluginHealthFlow.collectAsStateWithLifecycle()
+    val anyRunning = enabled.any { pluginHealth[it]?.running == true }
+
+    // Give the plugin a grace window to come up before declaring it unresponsive.
+    var graceExpired by remember(enabled, isExternalActive) { mutableStateOf(false) }
+    LaunchedEffect(enabled, isExternalActive, anyRunning) {
+        graceExpired = false
+        if (enabled.isNotEmpty() && isExternalActive && !anyRunning) {
+            delay(EXTERNAL_INIT_GRACE_MS)
+            graceExpired = true
+        }
+    }
+
+    val notResponding = enabled.isNotEmpty() && isExternalActive && !anyRunning && graceExpired
+    val (msgRes, subRes) = when {
+        installed.isEmpty() ->
+            R.string.external_no_plugins to R.string.external_no_plugins_desc
+        enabled.isEmpty() ->
+            R.string.external_no_plugin_active to R.string.external_no_plugin_active_desc
+        anyRunning ->
+            R.string.external_active to R.string.external_active_desc
+        notResponding ->
+            R.string.external_not_responding to R.string.external_not_responding_desc
+        else ->
+            R.string.external_waiting to R.string.external_waiting_desc
+    }
+
+    var dismissed by rememberSaveable { mutableStateOf(false) }
+
+    ElevatedWarningCard(
+        message = stringResource(msgRes),
+        subMessage = stringResource(subRes),
+        // Tap to retry only makes sense in the "not responding" state
+        onClick = { if (notResponding) controller.warmUpExternalPlugins() },
+        onDismiss = { dismissed = true },
+        visible = !dismissed
+    )
+}
+
+/**
+ * Displays the current zoom-factor as a text in the top-start corner.
+ * If the factor is equal to 1.0 the text is hidden.
+ *
+ * @param camera the camera to get the zoom-factor from
+ */
+@Composable
+fun BoxScope.ZoomStateInfo(camera: CameraInfo) {
+    val zoomState by camera.zoomState.observeAsState()
+    zoomState?.let {
+        AnimatedVisibility(
+            abs(it.zoomRatio - 1.0f) > 0.01f,
+            Modifier
+                .align(Alignment.TopStart)
+                .padding(8.dp)
+        ) {
+            Text(
+                "%.2fx".format(it.zoomRatio),
+                color = Color.White,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    shadow = Shadow(
+                        color = Color.Black,
+                        offset = Offset(0f, 0f),
+                        blurRadius = 8f
+                    )
+                )
+            )
+        }
+    }
+}
+
+/**
+ * Dialog showing information about the current device.
+ *
+ * @param dialogState state whether the dialog is open or not
+ * @param device the device to show information about
+ */
+@SuppressLint("MissingPermission")
+@Composable
+fun DeviceInfoDialog(
+    dialogState: DialogState,
+    device: BluetoothDevice
+) {
+    InfoDialog(dialogState, stringResource(R.string.info)) {
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            item {
+                Text(stringResource(R.string.name) + ":", fontWeight = FontWeight.Bold)
+                Text(device.name ?: "")
+            }
+
+            item {
+                Text(stringResource(R.string.mac_address) + ":", fontWeight = FontWeight.Bold)
+                Text(device.address)
+            }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                item {
+                    Text(stringResource(R.string.alias) + ":", fontWeight = FontWeight.Bold)
+                    Text(device.alias ?: "")
+                }
+            }
+
+            item {
+                Text(stringResource(R.string.type) + ":", fontWeight = FontWeight.Bold)
+                Text(
+                    when (device.type) {
+                        BluetoothDevice.DEVICE_TYPE_DUAL -> "Dual"
+                        BluetoothDevice.DEVICE_TYPE_LE -> "LE"
+                        BluetoothDevice.DEVICE_TYPE_CLASSIC -> "Classic"
+                        BluetoothDevice.DEVICE_TYPE_UNKNOWN -> "Unknown"
+                        else -> "?"
+                    } + " (${device.type})"
+                )
+            }
+
+            item {
+                Text(stringResource(R.string.clazz) + ":", fontWeight = FontWeight.Bold)
+                with(device.bluetoothClass?.majorDeviceClass) {
+                    val classString = remember(device) {
+                        DeviceInfo.deviceClassString(this)
+                    }
+                    Text("$classString (${this})")
+                }
+            }
+
+            item {
+                Text(stringResource(R.string.services) + ":", fontWeight = FontWeight.Bold)
+                val serviceInfo = remember(device) {
+                    DeviceInfo.deviceServiceInfo(device.bluetoothClass)
+                }
+                serviceInfo.forEach {
+                    Text(it)
+                }
+            }
+
+//            item {
+//                Text(stringResource(R.string.uuids) + ":", fontWeight = FontWeight.Bold)
+//                device.uuids?.forEach {
+//                    Text(it.toString())
+//                }
+//            }
+        }
+    }
+}
+
+@Composable
+fun KeyboardInputDialog(dialogState: DialogState) {
+    val controller = LocalController.current
+    val scope = rememberCoroutineScope { Dispatchers.IO }
+
+    val currentText = rememberTextFieldState("")
+    var sendingInProgress by remember(dialogState.openState) { mutableStateOf(false) }
+    val (extraKeys, setExtraKeys) = rememberSaveable { mutableStateOf(false) }
+
+    val focusRequester = remember { FocusRequester() }
+
+    val enabled = !sendingInProgress && currentText.text.isNotBlank()
+
+    ConfirmDialog(dialogState, stringResource(R.string.manual_input), enabled, onConfirm = {
+        scope.launch {
+            sendingInProgress = true
+            // Arabic-Indic and Persian digits typed or pasted are sent as 0-9 (a keyboard has no other digits).
+            controller?.sendString(ShihabDigits.latin(currentText.text), extraKeys, "MANUAL", null, null)
+        }.invokeOnCompletion {
+            close()
+        }
+    }) {
+        Column {
+            Text(stringResource(R.string.manual_input_desc))
+            Spacer(Modifier.height(8.dp))
+
+            OutlinedTextField(
+                state = currentText,
+                modifier = Modifier
+                    .focusRequester(focusRequester)
+                    .onFocusChanged { focusState ->
+                        if (focusState.isFocused) {
+                            currentText.edit { selectAll() }
+                        }
+                    }
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            Row(
+                Modifier
+                    .toggleable(
+                        value = extraKeys,
+                        role = Role.Checkbox,
+                        onValueChange = setExtraKeys
+                    )
+                    .padding(12.dp)
+                    .fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Checkbox(checked = extraKeys, onCheckedChange = null)
+                Spacer(Modifier.width(12.dp))
+                Text(stringResource(R.string.include_extra_keys))
+            }
+        }
+
+        LaunchedEffect(Unit) {
+            focusRequester.requestFocus()
+        }
+    }
+}
+
+@Composable
+fun ErrorDetailsDialog(dialogState: DialogState, error: Throwable) {
+    val stackTrace = remember(error) {
+        buildString {
+            appendLine(error.toString())
+            error.stackTrace.forEach { appendLine("\tat $it") }
+
+            var cause = error.cause
+            while (cause != null) {
+                appendLine()
+                appendLine("Caused by: $cause")
+                cause.stackTrace.forEach { appendLine("\tat $it") }
+                cause = cause.cause
+            }
+        }
+    }
+
+    InfoDialog(
+        dialogState,
+        title = stringResource(R.string.unexpected_error),
+        icon = {
+            Icon(Icons.Filled.Error, null, tint = MaterialTheme.colorScheme.error)
+        }
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(stringResource(R.string.unexpected_error_desc))
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 300.dp),
+                shape = MaterialTheme.shapes.small,
+                tonalElevation = 1.dp,
+                color = MaterialTheme.colorScheme.surfaceContainerLowest
+            ) {
+                SelectionContainer {
+                    Text(
+                        text = stackTrace,
+                        modifier = Modifier
+                            .verticalScroll(rememberScrollState())
+                            .padding(12.dp),
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = FontFamily.Monospace
+                        )
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun KeepScreenOn() {
+    val currentView = LocalView.current
+    val context = LocalContext.current
+
+    val keepScreenOn by context.getPreferenceState(PreferenceStore.KEEP_SCREEN_ON)
+    keepScreenOn?.let {
+        DisposableEffect(keepScreenOn) {
+            currentView.keepScreenOn = it
+            onDispose {
+                currentView.keepScreenOn = false
+            }
+        }
+    }
+}

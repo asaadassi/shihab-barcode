@@ -1,0 +1,23 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        google()
+        mavenCentral()
+    }
+}
+// Use old style dependency declaration since the new one is not yet supported by dependabot
+/*dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}*/
+rootProject.name = "ShihabBarcode"
+include ':app'
+
+
+// Shihab shared Android library (About, fonts, colours, language, updater, error log): one copy for every Shihab app.
+include ':shihab-android'
+project(':shihab-android').projectDir =
+    file((providers.gradleProperty('shihabShared').orNull ?: '../ShihabShared') + '/android/shihab-android')

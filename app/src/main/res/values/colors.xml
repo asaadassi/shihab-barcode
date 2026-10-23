@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#FF6200EE</color>
+    <color name="purple_700">#FF3700B3</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+
+    <!-- Shihab brand colours (Shihab.Common ShihabTheme: Accent, OnAccent and the end of AccentGradient). Every
+         screen colour is derived from these by ShihabPalette (BarcodeBrand), light and dark. -->
+    <color name="brand_primary">#EF5285</color>
+    <color name="brand_on_primary">#FFFFFF</color>
+    <color name="brand_accent">#C06AAF</color>
+    <color name="brand_background">#FCF9FB</color>
+    <color name="brand_text">#1C1720</color>
+</resources>

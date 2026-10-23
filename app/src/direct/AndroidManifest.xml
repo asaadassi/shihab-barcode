@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- GitHub build only: the update check and download (Shihab updater). The Google Play build has no internet
+         access at all, like the original app. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+</manifest>

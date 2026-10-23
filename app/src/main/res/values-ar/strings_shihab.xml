@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">باركود</string>
+    <string name="shihab_product_description">ماسح بلوتوث</string>
+    <string name="shihab_signature">باركود · ماسح بلوتوث من شهاب آب</string>
+    <string name="shihab_about">حول باركود</string>
+    <string name="shihab_language">اللغة</string>
+    <string name="shihab_close">إغلاق</string>
+    <string name="shihab_later">لاحقاً</string>
+    <string name="shihab_source_code">الكود المصدري</string>
+    <string name="shihab_source_desc">مبني على HID Barcode Scanner من Fabi019، برنامج حر برخصة GPL-3.0</string>
+    <string name="shihab_license_title">الرخصة (GPL-3.0)</string>
+    <string name="shihab_license_notice">باركود نسخة معدّلة من HID Barcode Scanner %1$s، حقوق النشر (C) لـ Fabian Kurz (Fabi019) والمساهمين، وعدّلتها شهاب آب عام 2026.\n\nهذا البرنامج حر: يحق لك إعادة توزيعه أو تعديله وفق شروط رخصة GNU العمومية العامة (GPL) الصادرة عن مؤسسة البرمجيات الحرة، الإصدار 3 أو أي إصدار لاحق حسب اختيارك. يُوزَّع دون أي ضمان. الكود المصدري الكامل متاح من رابط الكود المصدري أدناه.\n\nنص الرخصة الرسمي بالإنجليزية:</string>
+    <string name="shihab_update_check">التحقق من التحديثات</string>
+    <string name="shihab_update_check_desc">تنزيل أحدث إصدار من شهاب آب</string>
+    <string name="shihab_update_checking">جارٍ التحقق…</string>
+    <string name="shihab_update_downloading">جارٍ التنزيل %1$d%%</string>
+    <string name="shihab_update_up_to_date">لديك أحدث إصدار.</string>
+    <string name="shihab_update_none">لم يُنشر أي إصدار بعد.</string>
+    <string name="shihab_update_available">الإصدار %1$s متاح</string>
+    <string name="shihab_update_install">تحديث</string>
+    <string name="shihab_report_desc">مراسلة دعم شهاب آب مع رقم الإصدار وسجل الأخطاء</string>
+    <string name="shihab_report_subject">باركود %1$s: الإبلاغ عن مشكلة</string>
+    <string name="shihab_report_body_hint">اكتب وصف المشكلة هنا:</string>
+</resources>

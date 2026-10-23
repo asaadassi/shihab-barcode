@@ -1,0 +1,269 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Arabic for the upstream strings that values-ar/strings.xml does not translate yet (Barcode by Shihab App).
+     If an upstream merge adds one of these names to strings.xml, the build reports the duplicate: keep one. -->
+<resources>
+    <string name="scanner">الماسح</string>
+    <string name="send_to_device">إرسال إلى الجهاز</string>
+    <string name="scan_code_to_start">امسح أي رمز QR أو باركود\nللبدء.</string>
+    <string name="connection">الاتصال</string>
+    <string name="appearance">المظهر</string>
+    <string name="theme">السمة</string>
+    <string name="dynamic_theme">ألوان الجهاز</string>
+    <string name="dynamic_theme_desc">استخدام ألوان خلفية الجوال بدل ألوان شهاب</string>
+    <string name="overlay_type">شكل منطقة المسح</string>
+    <string name="full_inside">داخل المنطقة بالكامل</string>
+    <string name="scan_freq">سرعة المسح</string>
+    <string name="scan_res">دقة المسح</string>
+    <string name="extra_keys">مفاتيح إضافية</string>
+    <string name="play_sound">صوت المسح</string>
+    <string name="about">حول</string>
+    <string name="build_version">الإصدار</string>
+    <string name="scanned_devices">الأجهزة المكتشفة</string>
+    <string name="swipe_refresh">(اسحب من الأعلى للتحديث)</string>
+    <string name="send_delay_template">التأخير (ms): %.0f</string>
+    <string name="connecting">جارٍ الاتصال…</string>
+    <string name="haptic_feedback">اهتزاز عند المسح</string>
+    <string name="connected_with">متصل بـ: %s</string>
+    <string name="info">معلومات</string>
+    <string name="name">الاسم</string>
+    <string name="mac_address">عنوان MAC</string>
+    <string name="alias">الاسم المستعار</string>
+    <string name="type">النوع</string>
+    <string name="clazz">الفئة</string>
+    <string name="services">الخدمات</string>
+    <string name="code_types">أنواع الرموز</string>
+    <string name="bt_proxy_error">تعذّر الوصول إلى خدمة البلوتوث. أعد تشغيل التطبيق…</string>
+    <string name="bt_service_disconnected">انقطعت خدمة البلوتوث</string>
+    <string name="bt_service_connected">خدمة البلوتوث متصلة</string>
+    <string name="devices">الأجهزة</string>
+    <string name="more">المزيد</string>
+    <string name="unpair_device">إلغاء الاقتران مع %s؟</string>
+    <string name="connect">اتصال</string>
+    <string name="reset">إعادة الضبط</string>
+    <string name="back">رجوع</string>
+    <string name="source_code">الكود المصدري</string>
+    <string name="report_issue_desc">مراسلة دعم شهاب آب</string>
+    <string name="rate">التقييم على Google Play</string>
+    <string name="share">مشاركة</string>
+    <string name="share_via">مشاركة عبر</string>
+    <string name="refresh">تحديث</string>
+    <string name="bt_hid_service">خدمة لوحة مفاتيح البلوتوث</string>
+    <string name="service_running">الخدمة تعمل</string>
+    <string name="refresh_proxy">إعادة تحميل الخدمة</string>
+    <string name="stop_proxy">إيقاف الخدمة</string>
+    <string name="filter_regex">تصفية بتعبير نمطي</string>
+    <string name="filter_regex_desc">قبول الرموز المطابقة لتعبير نمطي (Regex) فقط</string>
+    <string name="filter_desc_long">يدعم صيغة Regex المعتادة. اتركه فارغاً أو اكتب .* لقبول كل الرموز. إن احتوى التعبير على مجموعة التقاط "(…)" تُستخدم قيمتها.</string>
+    <string name="custom_templ_desc_long" formatted="false">اضبط \'مفاتيح إضافية\' على \'مخصص\' أولاً.\n\n
+        عناصر الرمز:\n
+        • {CODE} - قيمة الباركود كما هي\n
+        • {CODE%N} - مجموعة الالتقاط رقم N من التعبير النمطي (مثل {CODE%1} و{CODE%2})، وتُستخدم {CODE} إن لم توجد المجموعة أو لم يُضبط تعبير\n
+        • الترميز: _HEX و_B64 بأي ترتيب\n
+        • أمثلة: {CODE_HEX} و{CODE_B64} و{CODE_HEX_B64} و{HEX_B64_CODE}\n\n
+        عناصر التاريخ والوقت مع تنسيق اختياري:\n
+        • {DATE} - التاريخ الحالي (الافتراضي: yyyy-MM-dd)\n
+        • {TIME} - الوقت الحالي (الافتراضي: HH:mm:ss)\n
+        • {DATETIME} - التاريخ والوقت (الافتراضي: yyyy-MM-dd HH:mm:ss)\n
+        • {SCAN_TIME} - وقت المسح (الافتراضي: yyyy-MM-dd HH:mm:ss.SSS)\n
+        • تنسيق مخصص: {DATE[format]} و{TIME[format]} و{DATETIME[format]} و{SCAN_TIME[format]}\n\n
+        رموز التنسيق:\n
+        • EEEE - اسم اليوم كاملاً، EEE - مختصراً\n
+        • MMMM - اسم الشهر كاملاً، MMM - مختصراً، MM - رقم الشهر\n
+        • yyyy - السنة كاملة، yy - آخر رقمين، dd - اليوم\n
+        • HH - الساعة (24)، hh - الساعة (12)، mm - الدقيقة، ss - الثانية، SSS - أجزاء الثانية، a - ص/م\n
+        • ملاحظة: النص بين علامتي اقتباس (\'text\') يظهر كما هو\n\n
+        أمثلة:\n
+        • {DATE[dd.MM.yyyy]} ← 03.10.2025\n
+        • {TIME[HH:mm:ss]} ← 14:30:45\n
+        • {DATETIME[dd.MM.yyyy HH:mm]} ← 03.10.2025 14:30\n
+        • {SCAN_TIME[dd/MM/yy HH:mm]} ← 03/10/25 14:30\n\n
+        عناصر معلومات المسح:\n
+        • {CODE_TYPE} - نوع الباركود (QR_CODE و CODE_128 وغيرها)\n
+        • {SCAN_SOURCE} - مصدر البيانات (SCAN و HISTORY و MANUAL)\n
+        • {SCANNER_ID} - معرّف الماسح\n
+        • {SCAN_IMAGE_NAME} - اسم صورة المسح المحفوظة\n\n
+        ترميز أي عنصر:\n
+        • أضف _HEX أو _B64 إلى أي عنصر وبأي ترتيب\n
+        • أمثلة: {DATE_HEX} و{TIME_B64} و{CODE_TYPE_HEX} و{DATETIME[dd.MM.yyyy]_B64}\n\n
+        ترميز النتيجة كاملة:\n
+        • {GLOBAL_HEX} - النتيجة كلها بالنظام الست عشري\n
+        • {GLOBAL_B64} - النتيجة كلها بترميز base64\n
+        • الجمع بينهما: {GLOBAL_HEX_B64} و{GLOBAL_B64_HEX}\n
+        • ملاحظة: في وضع RFCOMM تُحذف عناصر HID غير المدعومة أو تبقى نصاً حسب إعداد القائمة.\n\n
+        عناصر خاصة بلوحة المفاتيح (HID):\n
+        • المفاتيح: {F1–24} و{ENTER} و{ESC} و{TAB} و{BKSP} و{LEFT} و{RIGHT} و{UP} و{DOWN}\n
+        • خاصة: {SPACE} و{CR} و{LF} و{WAIT:n}\n
+        • ملاحظة: في وضع RFCOMM يُدعم {TAB} و{ENTER} فقط، ويمكن التحكم بإظهار غيرهما من القائمة.\n\n
+        مفاتيح التعديل تُكتب قبل اسم المفتاح:\n
+        \t^: Shift\n
+        \t+: Ctrl\n
+        \t#: Alt\n
+        \t@: Meta\n
+        مثال: {+r} يرسل CTRL+R، و{^#F1} يرسل SHIFT+ALT+F1، و{WAIT:10} ينتظر مدة 10 أحرف
+    </string>
+    <string name="camera">الكاميرا</string>
+    <string name="preview_performance_mode">وضع الأداء للمعاينة</string>
+    <string name="full_screen_scanner">الماسح بملء الشاشة</string>
+    <string name="rfcomm_listening">بانتظار الاتصال</string>
+    <string name="rfcomm_listening_from_device">بانتظار اتصال من %s</string>
+    <string name="camera_error">خطأ في الكاميرا</string>
+    <string name="custom_javascript">JavaScript مخصص</string>
+    <string name="js_error">خطأ JavaScript: %s</string>
+    <string name="editor">المحرر</string>
+    <string name="debug">التصحيح</string>
+    <string name="code">الرمز</string>
+    <string name="format">التنسيق</string>
+    <string name="output">النتيجة</string>
+    <string name="run">تشغيل</string>
+    <string name="export_csv">بيانات CSV</string>
+    <string name="export_json">بيانات JSON</string>
+    <string name="export_xml">بيانات XML</string>
+    <string name="export_lines">أسطر</string>
+    <string name="export_lines_description">نص في كل سطر رمز</string>
+    <string name="custom_keys">مفاتيح مخصصة</string>
+    <string name="character">الحرف</string>
+    <string name="hid_code_hex">رمز HID (HEX)</string>
+    <string name="modifier">مفتاح التعديل</string>
+    <string name="test">تجربة</string>
+    <string name="multi_code_detection">كشف عدة رموز</string>
+    <string name="multi_code_detection_desc">كشف كل الرموز الظاهرة في الإطار معاً وإرسالها بالتتابع</string>
+    <string name="add_scan_area">إضافة منطقة</string>
+    <string name="filter">تصفية</string>
+    <string name="date_range">المدة</string>
+    <string name="select_types">اختيار الأنواع</string>
+    <string name="clear">مسح</string>
+    <string name="apply">تطبيق</string>
+    <string name="save_to_file">حفظ في ملف</string>
+    <string name="invalid_regex">تعبير نمطي غير صالح</string>
+    <string name="template_error_duplicates">لا يُسمح بتكرار العناصر: %1$s</string>
+    <string name="detection">الكشف</string>
+    <string name="parser">المحلّل</string>
+    <string name="text_mode">طريقة النص</string>
+    <string name="note">ملاحظة</string>
+    <string name="ocr_app_github">تطبيق OCR من mtotschnig (GitHub)</string>
+    <string name="ext_ocr_support">دعم OCR خارجي</string>
+    <string name="scan_results">نتائج المسح</string>
+    <string name="enable_undo_send">التراجع عن آخر إرسال</string>
+    <string name="enable_undo_send_desc">زر يمسح أحرف آخر رمز أُرسل (Backspace لكل حرف)</string>
+    <string name="undo_last_sent">تراجع عن آخر إرسال</string>
+    <string name="include_extra_keys">مع المفاتيح الإضافية</string>
+    <string-array name="theme_values">
+        <item>حسب النظام</item>
+        <item>فاتح</item>
+        <item>داكن</item>
+    </string-array>
+    <string-array name="overlay_values">
+        <item>مربع (QR)</item>
+        <item>مستطيل (باركود)</item>
+        <item>مخصص</item>
+    </string-array>
+    <string-array name="scan_freq_values">
+        <item>الأسرع</item>
+        <item>سريع (100ms)</item>
+        <item>عادي (500ms)</item>
+        <item>بطيء (1s)</item>
+    </string-array>
+    <string-array name="scan_res_values">
+        <item>SD (480P)</item>
+        <item>HD (720P)</item>
+        <item>FHD (1080P)</item>
+        <item>UHD (2160P)</item>
+    </string-array>
+    <string-array name="extra_keys_values">
+        <item>لا شيء</item>
+        <item>Enter</item>
+        <item>Tab</item>
+        <item>مسافة</item>
+        <item>مخصص</item>
+    </string-array>
+    <string-array name="keyboard_layout_values">
+        <item>الإنجليزية (US)</item>
+        <item>الألمانية (DE)</item>
+        <item>الفرنسية (FR)</item>
+        <item>الإنجليزية (GB)</item>
+        <item>الإسبانية (ES)</item>
+        <item>الإيطالية (IT)</item>
+        <item>التركية Q (TR)</item>
+        <item>البولندية للمبرمجين (PL)</item>
+        <item>التشيكية (CZ)</item>
+        <item>البرتغالية (PO)</item>
+        <item>البرتغالية (BR)</item>
+        <item>الفرنسية (BE)</item>
+        <item>الهنغارية (HU)</item>
+    </string-array>
+    <string-array name="connection_mode_values">
+        <item>لوحة مفاتيح HID</item>
+        <item>RFCOMM (SPP)</item>
+        <item>الإرسال إلى الإضافات الخارجية فقط</item>
+    </string-array>
+    <string name="external_output">إضافات الإرسال الخارجي</string>
+    <string name="external_no_plugins">لا توجد إضافات مثبّتة</string>
+    <string name="external_no_plugins_desc">ثبّت تطبيق إضافة لتحويل نتائج المسح إلى جهة خارجية</string>
+    <string name="external_active">الإرسال الخارجي يعمل</string>
+    <string name="external_active_desc">تُرسل نتائج المسح إلى الإضافات المفعّلة</string>
+    <string name="external_no_plugin_active">لا تُرسل نتائج المسح</string>
+    <string name="external_no_plugin_active_desc">وضع الإرسال الخارجي مفعّل لكن لا توجد إضافة مفعّلة</string>
+    <string name="external_waiting">بانتظار الإضافة…</string>
+    <string name="external_waiting_desc">تبدأ الإضافة الخارجية الآن، انتظر لحظة</string>
+    <string name="external_not_responding">الإضافة لا تستجيب</string>
+    <string name="external_not_responding_desc">لم تبدأ الإضافة. انقر لإعادة المحاولة، أو افتحها مرة إن ثُبّتت للتو</string>
+    <string name="enable_external_output_desc">إرسال نتائج المسح إلى الإضافات المفعّلة في وضع HID و RFCOMM أيضاً</string>
+    <string name="external_long_press_hint">اضغط مطوّلاً على إضافة لفتح إعداداتها</string>
+    <string name="external_plugin_no_settings">ليس لهذه الإضافة إعدادات</string>
+    <string name="external_plugin_update_required">إصدار الإضافة غير متوافق، حدّث الإضافة</string>
+    <string name="external_plugin_no_permission">فقدت الإضافة صلاحيتها، أعد تثبيتها</string>
+    <string name="external_plugin_blocked">منع النظام تشغيل الإضافة، اسمح لها بالتشغيل التلقائي</string>
+    <string name="external_status_down">متوقفة</string>
+    <string name="external_status_connected">متصلة</string>
+    <string name="external_status_waiting">بالانتظار</string>
+    <string name="external_result_prefix">الإضافة</string>
+    <string name="external_result_sent">أُرسل</string>
+    <string name="external_result_failed">فشل</string>
+    <plurals name="export_items">
+        <item quantity="zero">تصدير %1$d عنصر</item>
+        <item quantity="one">تصدير عنصر واحد</item>
+        <item quantity="two">تصدير عنصرين</item>
+        <item quantity="few">تصدير %1$d عناصر</item>
+        <item quantity="many">تصدير %1$d عنصراً</item>
+        <item quantity="other">تصدير %1$d عنصر</item>
+    </plurals>
+    <string name="insecure_rfcomm">RFCOMM غير آمن</string>
+    <string name="insecure_rfcomm_desc">يسمح باتصالات RFCOMM غير الآمنة. استخدمه فقط مع الأجهزة القديمة التي لا تدعم الاتصال الآمن عبر منفذ البلوتوث التسلسلي (SPP).</string>
+    <string name="preserve_unsupported_placeholders">إبقاء العناصر غير المدعومة</string>
+    <string name="file_name_pattern_placeholder">العناصر: {TIMESTAMP} و{TIMESTAMP_ISO} و{CODE} و{FORMAT}</string>
+    <string name="try_denoise">محاولة إزالة التشويش</string>
+    <string name="qos_settings">إعدادات جودة الاتصال L2CAP</string>
+    <string name="qos_description">ملاحظة: لا تحتاج هذه القيم عادةً إلى تغيير. إن كان الاتصال غير مستقر فقد يفيد رفع معدل الرموز أو عرض النطاق الأقصى أو خفض زمن الاستجابة. تُطبَّق التغييرات بعد إعادة تشغيل التطبيق. للتفاصيل راجع مواصفات Bluetooth HID الإصدار 1.1.1، القسم 5.2 والملحق D.</string>
+    <string name="qos_service_type">نوع الخدمة</string>
+    <string name="qos_token_rate">معدل الرموز (بايت/ثانية)</string>
+    <string name="qos_token_bucket_size">حجم دلو الرموز (بايت)</string>
+    <string name="qos_peak_bandwidth">عرض النطاق الأقصى (بايت/ثانية)</string>
+    <string name="qos_latency">زمن الاستجابة (us)</string>
+    <string name="qos_delay_variation">تفاوت التأخير (us)</string>
+    <string name="export_settings">تصدير الإعدادات</string>
+    <string name="import_settings">استيراد الإعدادات</string>
+    <string name="import_keys">استيراد المفاتيح</string>
+    <string name="export_keys">تصدير المفاتيح</string>
+    <string name="import_settings_desc">يستبدل الاستيراد الإعدادات الموجودة في الملف فقط.</string>
+    <string name="import_keys_desc">الاستيراد من ملف يحذف كل المفاتيح المعرّفة حالياً.</string>
+    <string name="preview_stabilization">تثبيت المعاينة</string>
+    <string name="preview_stabilization_desc">تثبيت صورة الكاميرا إن كان الجوال يدعمه</string>
+    <string name="favourite_devices">الأجهزة المفضلة</string>
+    <string name="reset_favourites">مسح المفضلة</string>
+    <string name="toggle_favourite">إضافة إلى المفضلة أو إزالتها</string>
+    <string name="profiles">الملفات الشخصية</string>
+    <string name="active_profile_desc">انقر لإدارة الملفات الشخصية</string>
+    <string name="manage_profiles">إدارة الملفات الشخصية</string>
+    <string name="add_profile">إضافة ملف</string>
+    <string name="delete_profile">حذف الملف</string>
+    <string name="profile_name">اسم الملف</string>
+    <string name="profile_name_empty">اسم الملف مطلوب</string>
+    <string name="profile_name_exists">يوجد ملف بهذا الاسم</string>
+    <string name="profile_default">الافتراضي</string>
+    <string name="manual_input_desc">يُرسل النص بعد الضغط على موافق.</string>
+    <string name="detector_error">خطأ في الكشف: %s</string>
+    <string name="unexpected_error">خطأ غير متوقع</string>
+    <string name="unexpected_error_desc">يمكنك نسخ التفاصيل أدناه وإرفاقها بالبلاغ.</string>
+    <string name="directly_apply_template">تطبيق القالب مباشرة</string>
+    <string name="register_app_permission_error">رفض النظام الصلاحية. لن يعمل وضع لوحة المفاتيح (HID).</string>
+</resources>

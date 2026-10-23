@@ -1,0 +1,1 @@
+First release of Barcode by Shihab App, based on HID Barcode Scanner 2.3.2: Arabic first, Shihab look, defaults for the Awqaf sabr platform.

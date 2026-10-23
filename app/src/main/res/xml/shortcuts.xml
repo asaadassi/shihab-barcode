@@ -1,0 +1,37 @@
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="scanner"
+        android:enabled="true"
+        android:icon="@android:drawable/ic_menu_camera"
+        android:shortcutShortLabel="@string/scanner"
+        android:shortcutLongLabel="@string/scanner">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.shihabapp.barcode"
+            android:targetClass="dev.fabik.bluetoothhid.MainActivity"
+            android:data="Scanner" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="history"
+        android:enabled="true"
+        android:icon="@android:drawable/ic_menu_recent_history"
+        android:shortcutShortLabel="@string/history"
+        android:shortcutLongLabel="@string/history">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.shihabapp.barcode"
+            android:targetClass="dev.fabik.bluetoothhid.MainActivity"
+            android:data="History" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="settings"
+        android:enabled="true"
+        android:icon="@android:drawable/ic_menu_preferences"
+        android:shortcutShortLabel="@string/settings"
+        android:shortcutLongLabel="@string/settings">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.shihabapp.barcode"
+            android:targetClass="dev.fabik.bluetoothhid.SettingsActivity" />
+    </shortcut>
+</shortcuts>

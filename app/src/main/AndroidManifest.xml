@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+     Explicitly declare required features to prevent Google Play
+     from filtering out the app unnecessarily.
+     -->
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="true" />
+    <uses-feature
+        android:name="android.hardware.camera.autofocus"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.camera.flash"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.bluetooth"
+        android:required="true" />
+    <uses-feature
+        android:name="android.hardware.location"
+        android:required="false" />
+
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- Permission that external transport extensions must hold to receive scan broadcasts.
+         "normal" allows any installed extension to request it; use "signature" to restrict
+         to first-party extensions only. -->
+    <permission
+        android:name="com.shihabapp.barcode.permission.RECEIVE_SCANS"
+        android:protectionLevel="normal" />
+    <!-- Defining a permission does NOT grant it: plugin receivers are gated on the SENDER holding
+         RECEIVE_SCANS, so the core must request its own permission or every control/scan broadcast
+         is silently dropped by the system. -->
+    <uses-permission android:name="com.shihabapp.barcode.permission.RECEIVE_SCANS" />
+
+    <!-- Lets the app discover installed extensions (receivers of BARCODE_SCANNED) on Android 11+
+         and resolve their optional settings activity. -->
+    <queries>
+        <intent>
+            <action android:name="dev.fabik.bluetoothhid.action.BARCODE_SCANNED" />
+        </intent>
+        <intent>
+            <action android:name="dev.fabik.bluetoothhid.plugin.action.SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="dev.fabik.bluetoothhid.plugin.action.PING" />
+        </intent>
+    </queries>
+
+    <uses-permission
+        android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30" />
+
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation"
+        tools:targetApi="s" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <uses-permission
+        android:name="android.permission.ACCESS_COARSE_LOCATION"
+        android:maxSdkVersion="30" />
+    <uses-permission
+        android:name="android.permission.ACCESS_FINE_LOCATION"
+        android:maxSdkVersion="30" />
+
+    <!-- Remove: Added from androidx.media3:media3-common included by androidx.camera:camera-video  -->
+    <uses-permission
+        android:name="android.permission.ACCESS_NETWORK_STATE"
+        tools:node="remove" />
+
+    <application
+        android:name=".shihab.BarcodeApp"
+        android:allowBackup="true"
+        android:hardwareAccelerated="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.BluetoothHID"
+        tools:targetApi="33">
+
+        <service
+            android:name=".bt.BluetoothService"
+            android:foregroundServiceType="connectedDevice"
+            android:stopWithTask="true" />
+
+        <service
+            android:name=".utils.JsEngineService"
+            android:stopWithTask="true" />
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:launchMode="singleTask"
+            android:preferMinimalPostProcessing="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity>
+
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:preferMinimalPostProcessing="true">
+            <intent-filter>
+                <action android:name="android.intent.action.APPLICATION_PREFERENCES" />
+                <category android:name="android.intent.category.PREFERENCE" />
+            </intent-filter>
+        </activity>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+    </application>
+
+</manifest>

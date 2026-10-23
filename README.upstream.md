@@ -1,0 +1,374 @@
+<div align="center">
+  <a href="https://github.com/Fabi019/hid-barcode-scanner/actions/workflows/android.yml"><img src="https://github.com/Fabi019/hid-barcode-scanner/actions/workflows/android.yml/badge.svg" /></a>
+  <a href="https://play.google.com/store/apps/details?id=dev.fabik.bluetoothhid&pcampaignid=pcampaignidMKT-Other-global-all-co-prtnr-py-PartBadge-Mar2515-1"><img src="https://img.shields.io/endpoint?color=brightgreen&logo=google-play&logoColor=white&url=https%3A%2F%2Fplay.cuzi.workers.dev%2Fplay%3Fi%3Ddev.fabik.bluetoothhid%26l%3DDownloads%26m%3D%24totalinstalls"></a>
+    <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fgithub.com%2Fkitswas%2Ffdroid-metrics-dashboard%2Fraw%2Frefs%2Fheads%2Fmain%2Fprocessed%2Ftotal%2Fdev.fabik.bluetoothhid.json&query=%24.total_downloads&logo=fdroid&label=Downloads" alt='Downloads (all time)'>
+  <img alt="GitHub Downloads (all assets, all releases)" src="https://img.shields.io/github/downloads/Fabi019/hid-barcode-scanner/total?logo=github&label=Downloads">
+  <a href="https://github.com/Fabi019/hid-barcode-scanner/actions/workflows/test.yml"><img src="https://github.com/Fabi019/hid-barcode-scanner/actions/workflows/test.yml/badge.svg" /></a>
+
+  <br/>
+  <br/>
+
+  <img alt="App Logo" src="app/src/main/ic_launcher-playstore.png" width="100" />
+
+  <h1>HID Barcode Scanner</h1>
+</div>
+
+
+Android app for scanning barcodes with the phone camera and sending them to a PC via bluetooth. No
+special software is required on the PC as this app uses the BluetoothHID API available on devices
+running Android 9 or greater.
+
+## Features
+
+- Supports a wide range of Linear and 2D-Codes thanks to
+  the [zxing-cpp](https://github.com/zxing-cpp/zxing-cpp) library
+- Doesn't require any internet connection
+- History feature that allows exporting the session as text, JSON or CSV
+- Multiple different keyboard layouts to choose from
+- Large amount of customization for different use-cases
+    - Extra keys like \n or \t
+    - Template engine to send additional special keys including modifier combinations
+    - Regex filtering of codes with support for capture group extraction
+    - JavaScript engine to implement custom logic based on the value and type
+    - Auto connect with last device
+    - Auto send on detection
+    - And much more
+
+## Screenshots
+
+Device list and Scanner screen. If you don't want to connect with any device now and just want to
+try out the scanner, pressing the 'Skip'-Button at the bottom of the paired devices will bring you
+directly to the scanner.
+
+Otherwise, the app tries to connect with the selected device and automatically sends you to the
+scanner once connected.
+
+<img alt="Devices" src="img/devices.png" width="200px" /> <img alt="Main" src="img/main.png" width="200px" />
+
+All configurable Settings. *(Newer versions might contain more or less settings as shown in the
+pictures)*
+
+<img alt="Settings" src="img/settings1.png" width="200px" /> <img alt="Settings" src="img/settings2.png" width="200px" />
+
+## Download
+
+<div>
+  <img alt="F-Droid Version" src="https://img.shields.io/f-droid/v/dev.fabik.bluetoothhid">
+  <img alt="IzzyOnDroid" src="https://img.shields.io/endpoint?url=https://apt.izzysoft.de/fdroid/api/v1/shield/dev.fabik.bluetoothhid&label=IzzyOnDroid">
+  <img alt="GooglePlay" src="https://img.shields.io/endpoint?url=https://play.cuzi.workers.dev/play?i=dev.fabik.bluetoothhid&gl=US&hl=en&label=PlayStore&m=$version">
+  <img alt="GitHub" src="https://img.shields.io/github/v/release/Fabi019/hid-barcode-scanner?include_prereleases&label=GitHub">
+</div>
+
+[<img src="https://f-droid.org/badge/get-it-on.png" width='200px'>](https://f-droid.org/packages/dev.fabik.bluetoothhid)
+[<img src="https://gitlab.com/IzzyOnDroid/repo/-/raw/master/assets/IzzyOnDroid.png" alt="Get it at IzzyOnDroid" width='200px'>](https://apt.izzysoft.de/packages/dev.fabik.bluetoothhid)
+[<img alt='Get it on Google Play' src='https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png' width='200px'/>](https://play.google.com/store/apps/details?id=dev.fabik.bluetoothhid)
+[<img src="https://raw.githubusercontent.com/rubenpgrady/get-it-on-github/refs/heads/main/get-it-on-github.png" width='200px'>](https://github.com/Fabi019/hid-barcode-scanner/releases)
+
+> [!NOTE]
+> Google signs the app on the Play Store with a different key. Because of this, once you install the app from Google Play, you can only switch to another source by uninstalling the app first.
+
+### Download nightly builds from [CI](https://github.com/Fabi019/hid-barcode-scanner/actions/workflows/test.yml)
+
+Please note that the CI version might be unstable and that the builds are not signed (debug
+builds), thus requiring you to install them on your phone using *ADB*. The download links below
+are using *nightly.link* to provide the files because GitHub doesn't allow to download files from
+actions without being logged in.
+
+- Latest APK (Debug): [here](https://nightly.link/Fabi019/hid-barcode-scanner/workflows/test/main/APK%28s%29%20debug%20generated.zip)
+
+## Troubleshooting
+
+Below you find some common issues with possible solutions.
+If these don't help, feel free to open a new issue and describe your problem in detail.
+
+### Connection dialog visible, but no connection possible
+
+This is most likely caused because the phone was paired with the PC previously and now doesn't
+accept a new type of connection request.
+
+***Solution:***
+
+1. Make sure to first unpair the PC on the phone either from within the app or from the system
+   Bluetooth settings
+2. Remove the phone from the PC device list.
+   On Windows you can either do this through the device manager (look under the Bluetooth category)
+   and choose *Uninstall Device* or using the device list in the settings app.
+3. In the app now search for new devices and click on the target PC (This step could be important so
+   that the phone can tell the PC the new device type)
+4. A pairing request should show up and you may need to confirm a pin on both sides
+5. After that the connection should be successfully established
+
+### Nothing happens when clicking on a device
+
+If there is not even a connection dialog when clicking on a device. This means that the registered
+Bluetooth proxy was interrupted. Normally it should be connected again right away but in some cases
+this might not happen.
+
+***Solution:***
+
+Restart the app. When launching again, there should be a small message at the bottom of the screen
+that says the Bluetooth proxy was successfully connected. Otherwise you may have to toggle bluetooth
+or restart your device. This could also mean that your device does not support the Bluetooth HID profile.
+To test this, search for the app "Bluetooth HID Profile Tester" in the PlayStore and see what the result is.
+If the test is not successful, unfortunately your device is not supported.
+
+### QR/Barcode not detected
+
+Can be caused by very dense codes and/or not optimal lightning conditions.
+
+***Solutions:***
+
+- Increase the scan resolution to FHD or QHD
+- Set scan frequency to Fast/Fastest
+- Enable "Preview performance mode" (if supported by the camera)
+- Use phone torch or external lightning if scene is too dark
+- In "Advanced options":
+  - Enable "Try harder" (enabled by default as of v2.2.1)
+  - Enable "Try denoise" (only available since v2.2.1)
+  - If you are scanning barcodes that are rotated by +-90°, enable "Try rotate image"
+  - If you are scanning inverted QR/barcodes, enable "Try inverted"
+  - Reduce "Minimum scan-lines"
+  - Try out different binarizers
+
+### Stuck key/Lost keys after transmission
+
+Can happen due to connection instabilities.
+If the last key release packet was lost, this will cause the key to endlessly repeat on the PC 
+
+***Solution:***
+
+Toggling Bluetooth on the PC or sending a new key using the manual input should reset the stuck key.
+
+To reduce the chance of happening in the future: Increase the "Transmit delay" (>20ms). 
+Otherwise you could try to tweak the L2CAP QoS settings in the top right menu of the settings.
+Increasing the token rate/peak bandwith or decreasing the latency might help.
+
+### Error: JSEngine not initialized or unsupported
+
+The engine for running JavaScript is provided by the system WebView.
+Normally this should be pre-installed as "Android System WebView".
+In case this is missing, you will get the above error. You might be able
+to install an alternative WebView for example [cromite](https://github.com/uazo/cromite).
+Installation guide: https://github.com/bromite/bromite/wiki/Installing-SystemWebView
+
+## Contributing
+
+Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+
+If you have a suggestion that would make this better, please fork the repo and create a pull request. You can also simply open a new issue with the tag "enhancement".
+
+1. Fork the Project
+2. Clone/Open the Repository in Android Studio
+3. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+4. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+5. Push to the Branch (`git push origin feature/AmazingFeature`)
+6. Open a Pull Request
+
+### Adding new keyboard layout
+
+When the app sends a code to the connected device it doesn't send characters directly.
+Instead the app works by sending raw HID-codes to the connected device (The same way a USB-keyboard
+behaves).
+It is then up to the connected device to interpret this HID-code depending on the layout that is
+currently selected in the OS.
+This means, that if a scanned barcode contains the character 'Z', the app needs to know the keyboard
+layout that the host PC expects (QWERTZ/QWERTY) to send the right HID-code that result in that
+character.
+To solve this the layout in the app must match the selected layout in the PC.
+
+The app already implements a basic set of keyboard layouts to choose from.
+If you want to add a new keyboard layout the following steps might help you:
+
+1. The first step is to create the actual keyboard layout file, for this a great guide already
+   exists in the layout for the [polish keyboard](app/src/main/assets/keymaps/pl.layout).
+   The layout file always consists of a list of characters with the hid code and modifier.
+   Alternatively you can also use the latest Python script
+   from [#438](https://github.com/Fabi019/hid-barcode-scanner/issues/438)
+   to automatically generate the layout based on the data from <https://kbdlayout.info>
+2. Add the name of the layout to the `<string-array name="keyboard_layout_values">` for every
+   available language under `app/src/main/res/values-*/strings.xml`
+3. Extend the `KeyboardLayout` enum
+   in [PreferenceStore.kt](https://github.com/Fabi019/hid-barcode-scanner/blob/f62141654e3204b9e2e3ca1aee63a4822f51361a/app/src/main/java/dev/fabik/bluetoothhid/utils/PreferenceStore.kt#L46).
+   The placement of the entry should match the positions in `keyboard_layout_values` and the value is the name of
+   the layout file without extension (usually two letters)
+
+## Connection Modes
+
+The app supports three connection modes: **HID** (default), **RFCOMM** (Serial Port Profile) and
+output to external plugins.
+While HID mode works immediately by emulating a keyboard, RFCOMM mode requires additional setup and
+may need software on your PC to receive data.
+
+### Setting up RFCOMM mode
+
+1. **Enable RFCOMM mode:**
+   - Open the app settings
+   - Change "Connection Mode" from "HID Keyboard" to "RFCOMM (SPP)"
+
+2. **Pair your devices:**
+   - Unpair your phone from PC (both sides) if previously connected
+   - Remove phone from PC Bluetooth device list
+   - In the app, search for devices and connect to your PC
+   - Confirm pairing on both devices
+
+3. **Verify COM port creation:**
+   - On Windows: Go to Device Manager → Ports (COM & LPT)
+   - You should see "Standard Serial over Bluetooth link" with a COM port number
+   - If not visible, try unpairing and re-pairing using the app
+
+4. **Receiving data on PC:**
+   - **Option A:** Use terminal software (PuTTY, RealTerm, Arduino IDE Serial Monitor)
+   - **Option B:** Write custom software to read from the COM port
+   - **Option C:** Use PowerShell: `[System.IO.Ports.SerialPort]::GetPortNames()` to list ports
+
+### Troubleshooting RFCOMM
+
+**No COM port appears:**
+- Unpair devices completely and re-pair using the app (not Windows settings)
+- Ensure "RFCOMM (SPP)" mode is selected before pairing
+- **Manual COM port management:** If automatic port creation fails:
+  1. Go to Windows Bluetooth settings → More Bluetooth options → COM Ports tab
+  2. Click "Add" → Select "Outgoing" port type
+  3. Choose your phone from device list → Select "Barcode Scanner" service
+  4. Click OK to create the COM port
+
+**Technical details:**
+- **Protocol:** Bluetooth SPP (Serial Port Profile)
+- **UUID:** `00001101-0000-1000-8000-00805F9B34FB`
+- **Data encoding:** UTF-8
+- **Connection:** Bidirectional (app can send and receive data)
+- **Baud rate:** Not applicable (Bluetooth protocol handles data transfer)
+
+**For developers:**
+Sample Python code to read from RFCOMM:
+```python
+import serial
+port = serial.Serial('COM3')  # Baud rate not needed for Bluetooth SPP
+while True:
+    data = port.readline().decode('utf-8').strip()
+    print(f"Received: {data}")
+```
+
+Sample C# code using System.IO.Ports:
+```csharp
+using System.IO.Ports;
+
+SerialPort port = new SerialPort("COM3");
+port.Open();
+while (true) {
+    string data = port.ReadLine();
+    Console.WriteLine($"Received: {data}");
+}
+```
+
+**Recommended for C# developers:** [InTheHand.Net.Bluetooth](https://github.com/inthehand/32feet) library provides better Bluetooth support that allows You more robust connection handling compared to System.IO.Ports.
+
+## External plugins
+
+The app also supports sending the scanned value directly to all installed and enabled plugins.
+These can then be used to implement custom transmission protocols to send the codes for example over
+HTTP to a PC in the same network.
+
+### List of known plugins
+
+- [Minimal example Plugin](https://github.com/Fabi019/bt-scanner-example-plugin) can be used as a starting point
+- [TCP Transport Plugin](https://github.com/WinLin97/hid-barcode-scanner-plugin-tcp) by WinLin97
+
+*If you want your plugin added to this list just let me know*
+
+### Create a new plugin
+
+Each plugin lives in a separate app. Following is an example manifest file that can be used as a
+starting point:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<application xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Required permission for the plugin to be detected and receive scans -->
+    <uses-permission android:name="dev.fabik.bluetoothhid.permission.RECEIVE_SCANS" />
+    <!-- Required to send plugin results back -->
+    <queries>
+        <package android:name="dev.fabik.bluetoothhid" />
+    </queries>
+
+    <application>
+        <activity>
+            <!-- Optional: Settings entry-point opened on long-press in the plugin picker -->
+            <intent-filter>
+                <action android:name="dev.fabik.bluetoothhid.plugin.action.SETTINGS" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- Receives scans. Metadata is shown in the plugin picker. -->
+        <receiver android:name=".ScanReceiver" android:exported="true"
+            android:permission="dev.fabik.bluetoothhid.permission.RECEIVE_SCANS">
+            <intent-filter>
+                <action android:name="dev.fabik.bluetoothhid.action.BARCODE_SCANNED" />
+            </intent-filter>
+            <meta-data android:name="dev.fabik.bluetoothhid.plugin.label"
+                android:value="Example Plugin" />
+            <meta-data android:name="dev.fabik.bluetoothhid.plugin.shortLabel"
+                android:value="Example" />
+            <meta-data android:name="dev.fabik.bluetoothhid.plugin.author"
+                android:value="The author" />
+        </receiver>
+
+        <!-- Lifecycle + health channel from the core (warm up / release / liveness ping). -->
+        <receiver android:name=".PluginControlReceiver" android:exported="true"
+            android:permission="dev.fabik.bluetoothhid.permission.RECEIVE_SCANS">
+            <intent-filter>
+                <action android:name="dev.fabik.bluetoothhid.plugin.action.SET_ENABLED" />
+                <action android:name="dev.fabik.bluetoothhid.plugin.action.PING" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>
+```
+
+When the app receives an `BARCODE_SCANNED` broadcast, the following data is transmitted as `Extra`
+inside the intent.
+(All definitions of the various fields can be found in the
+file [ExternalProtocol.kt](https://github.com/Fabi019/hid-barcode-scanner/blob/main/app/src/main/java/dev/fabik/bluetoothhid/bt/ExternalProtocol.kt))
+
+- Protocol version
+- Scan id for responding to a scan
+- Raw value & Processed value
+- Format
+- Timestamp
+- Source and Scanner ID
+- Regex groups
+- Scan image name
+
+The external plugin must also react to any `action.PING` requests from the app by responding with an
+intent for example
+with the following content:
+
+```kotlin
+val intent = Intent("dev.fabik.bluetoothhid.plugin.action.STATUS").apply {
+    setPackage("dev.fabik.bluetoothhid")
+    putExtra("protocol_version", 1)
+    putExtra("package", ctx.packageName)
+    putExtra("running", true)
+    // Supported states: IDLE, STARTING, CONNECTING, CONNECTED, LISTENING, ERROR, BLOCKED, NO_PERMISSION, UNKNOWN
+    putExtra("state", "IDLE")
+    putExtra("status_detail", "Example plugin connected")
+}
+ctx.sendBroadcast(intent)
+```
+
+## License
+
+Copyright (C) 2023-2026 Fabi019
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+*Google Play and the Google Play logo are trademarks of Google LLC.*

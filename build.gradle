@@ -1,0 +1,25 @@
+buildscript {
+    allprojects {
+        repositories {
+            google()
+            mavenCentral()
+        }
+    }
+
+    ext {
+        compose_ui_version = '1.12.0'
+        compose_mat_version = '1.7.8'
+        camerax_version = '1.6.2'
+        accomp_version = '0.37.3'
+        agp_version = '9.3.0'
+        kotlin_version = '2.2.20'
+    }
+}
+
+plugins {
+    id 'com.android.application' version "$agp_version" apply false
+    // Shihab shared Android library (shihab-android) is a library module with its own Kotlin plugin.
+    id 'com.android.library' version "$agp_version" apply false
+    id 'org.jetbrains.kotlin.android' version "$kotlin_version" apply false
+    id 'org.jetbrains.kotlin.plugin.compose' version "$kotlin_version" apply false
+}
