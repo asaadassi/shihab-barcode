@@ -49,7 +49,9 @@ val LocalDataStore = staticCompositionLocalOf<DataStore<Preferences>> {
 // Enums for type-safe preference values
 // Note: ordinal is used as index - no need for explicit val index
 enum class ConnectionMode {
-    HID, RFCOMM, EXTERNAL;
+    // Shihab: PC = Barcode Receiver on Windows over Wi-Fi or the USB cable (docs/PC-LINK.md).
+    // LOCAL = read only: scans go to the history, nothing is sent.
+    HID, RFCOMM, EXTERNAL, PC, LOCAL;
     companion object {
         fun fromIndex(index: Int) = entries.getOrNull(index) ?: HID
     }
@@ -85,20 +87,22 @@ enum class ScanResolution(val size: Size) {
     SD_480P(Size(640, 480)), HD_720P(Size(960, 720)),
     FHD_1080P(Size(1440, 1080)), UHD_2160P(Size(2160, 1440));
     companion object {
-        fun fromIndex(index: Int) = entries.getOrNull(index) ?: HD_720P
+        // Shihab: the sabr form's EAN-13 is small (about 28 mm): 1080p keeps its bars wide enough to decode.
+        fun fromIndex(index: Int) = entries.getOrNull(index) ?: FHD_1080P
     }
 }
 enum class ScanFrequency(val delayMs: Int) {
-    FASTEST(0), FAST(100), NORMAL(500), SLOW(1000);
+    FASTEST(0), FAST(100), NORMAL(500), SLOW(1000), INTERVAL_5S(5000);
     companion object {
-        // Shihab: fast scanning by default (forms are scanned one after another).
-        fun fromIndex(index: Int) = entries.getOrNull(index) ?: FAST
+        // Shihab: 5 s between readings by default, time to change the form; rapid scanning ignores it.
+        fun fromIndex(index: Int) = entries.getOrNull(index) ?: INTERVAL_5S
     }
 }
 enum class OverlayType {
     SQUARE, RECTANGLE, CUSTOM;
     companion object {
-        fun fromIndex(index: Int) = entries.getOrNull(index) ?: SQUARE
+        // Shihab: a wide frame for the form's barcode (a square one cuts long barcodes).
+        fun fromIndex(index: Int) = entries.getOrNull(index) ?: RECTANGLE
     }
 }
 enum class Binarizer(val readerValue: BarcodeReader.Binarizer) {
@@ -256,6 +260,8 @@ open class PreferenceStore {
         val SCANNER_FULL_SCREEN = booleanPreferencesKey("scanner_full_screen") defaultsTo false
         val THEME = intPreferencesKey("theme").enumDefaultsTo(Theme::fromIndex)
         val DYNAMIC_THEME = booleanPreferencesKey("dynamic_theme") defaultsTo false
+        // Shihab: the upstream advanced options are hidden until this is turned on.
+        val SHOW_ADVANCED = booleanPreferencesKey("shihab_show_advanced") defaultsTo false
 
         // Camera
         // val AUTO_FOCUS = booleanPreferencesKey("auto_focus") defaultsTo true // Removed
@@ -272,15 +278,21 @@ open class PreferenceStore {
 
         // Scanner
         val SCAN_FREQUENCY = intPreferencesKey("scan_freq").enumDefaultsTo(ScanFrequency::fromIndex)
-        val CODE_TYPES = stringSetPreferencesKey("code_types") defaultsTo setOf()
+        // Shihab: EAN-13 (the personal number on sabr forms and cards) and QR (the PC pairing code) only: fewer
+        // formats read faster and never mistake part of a barcode for another, shorter format.
+        val CODE_TYPES = stringSetPreferencesKey("code_types") defaultsTo setOf("5", "8")
         val SCAN_REGEX = stringPreferencesKey("scan_regex") defaultsTo ""
         val RESTRICT_AREA = booleanPreferencesKey("restrict_area") defaultsTo true
         val FULL_INSIDE = booleanPreferencesKey("full_inside") defaultsTo true
         val OVERLAY_TYPE = intPreferencesKey("overlay_type").enumDefaultsTo(OverlayType::fromIndex)
         val AUTO_SEND = booleanPreferencesKey("auto_send") defaultsTo true
         val MULTI_CODE_DETECTION = booleanPreferencesKey("multi_code_detection") defaultsTo false
-        val PLAY_SOUND = booleanPreferencesKey("play_sound") defaultsTo false
-        val VIBRATE = booleanPreferencesKey("vibrate") defaultsTo false
+        // Shihab: rapid continuous scanning, toggled from the scanner bar.
+        val RAPID_SCAN = booleanPreferencesKey("shihab_rapid_scan") defaultsTo false
+        // Shihab: off = a code already read in this session is ignored (not sent, not added again).
+        val ALLOW_DUPLICATES = booleanPreferencesKey("shihab_allow_duplicates") defaultsTo true
+        val PLAY_SOUND = booleanPreferencesKey("play_sound") defaultsTo true
+        val VIBRATE = booleanPreferencesKey("vibrate") defaultsTo true
         val AUTO_COPY_TO_CLIPBOARD = booleanPreferencesKey("auto_copy_to_clipboard") defaultsTo false
         val CLEAR_AFTER_SEND = booleanPreferencesKey("clear_after_send") defaultsTo false
         val ENABLE_UNDO_SEND = booleanPreferencesKey("enable_undo_send") defaultsTo false

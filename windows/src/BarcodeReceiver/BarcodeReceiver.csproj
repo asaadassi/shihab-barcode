@@ -1,0 +1,68 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Barcode Receiver: the Windows side of Barcode (Android). Receives scans over Wi-Fi, the USB cable (adb reverse)
+       or Bluetooth (RFCOMM) and types them into the active window (protocol: ..\..\..\docs\PC-LINK.md). -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <!-- Windows 10 2004+: Bluetooth RFCOMM through Windows.Devices.Bluetooth (WinRT) -->
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>BarcodeReceiver</RootNamespace>
+    <AssemblyName>ShihabBarcodeReceiver</AssemblyName>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <Version>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)..\..\VERSION').Trim())</Version>
+    <Company>Shihab App</Company>
+    <Product>Barcode Receiver</Product>
+    <Copyright>© 2026 Shihab App — https://shihab.app/</Copyright>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <SelfContained>false</SelfContained>
+    <!-- adb.exe and its two DLLs from the Android SDK, shipped in an "adb" folder for the cable link -->
+    <AdbDir Condition="'$(AdbDir)' == ''">D:\AndroidSdk\platform-tools</AdbDir>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <DebugType>none</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="System.IO" />
+    <Using Include="Shihab.Common.AppLog" Alias="AppLog" />
+    <InternalsVisibleTo Include="BarcodeReceiver.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\logo.png" />
+    <Resource Include="Assets\app.ico" />
+  </ItemGroup>
+
+  <ItemGroup Condition="Exists('$(AdbDir)\adb.exe')">
+    <Content Include="$(AdbDir)\adb.exe;$(AdbDir)\AdbWinApi.dll;$(AdbDir)\AdbWinUsbApi.dll"
+             Link="adb\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <Content Include="$(AdbDir)\NOTICE.txt" Condition="Exists('$(AdbDir)\NOTICE.txt')"
+             Link="adb\NOTICE.txt" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- QR code for pairing (Apache-2.0), as in Shihab Remote -->
+    <PackageReference Include="ZXing.Net" Version="0.16.9" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+  </ItemGroup>
+
+  <!-- Shared Shihab libraries: theme and Almarai, About, news, problem report, crash handler, single instance,
+       window place, digits, tray icon; Shihab.Updater comes with it -->
+  <ItemGroup>
+    <ProjectReference Include="$(ShihabShared)\src\Shihab.Common\Shihab.Common.csproj" Condition="'$(ShihabShared)' != ''" />
+    <ProjectReference Include="..\..\..\..\ShihabShared\src\Shihab.Common\Shihab.Common.csproj" Condition="'$(ShihabShared)' == ''" />
+  </ItemGroup>
+</Project>

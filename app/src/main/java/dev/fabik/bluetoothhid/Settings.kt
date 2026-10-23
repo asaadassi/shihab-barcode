@@ -55,6 +55,7 @@ import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.ShutterSpeed
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.VideoStable
 import androidx.compose.material.icons.filled.ZoomIn
@@ -63,6 +64,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
@@ -98,6 +100,7 @@ import dev.fabik.bluetoothhid.utils.LocalDataStore
 import dev.fabik.bluetoothhid.utils.PreferenceStore
 import dev.fabik.bluetoothhid.utils.ProfileManager
 import dev.fabik.bluetoothhid.utils.rememberEnumPreference
+import dev.fabik.bluetoothhid.utils.rememberPreference
 import dev.fabik.bluetoothhid.utils.setPreference
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -116,15 +119,18 @@ fun SettingsContent() {
     val isHidOnly = connectionMode == ConnectionMode.HID
     val isExternal = connectionMode == ConnectionMode.EXTERNAL
 
-    val profileSettings = remember { buildProfileSettings() }
-    val connectionSettings = remember(isHidOnly, isExternal) {
-        buildConnectionSettings(strings, isHidOnly, isExternal)
+    // Shihab: the simple screen by default; the upstream options stay one switch away.
+    var advanced by rememberPreference(PreferenceStore.SHOW_ADVANCED)
+
+    val profileSettings = remember(advanced) { buildProfileSettings(advanced) }
+    val connectionSettings = remember(isHidOnly, isExternal, advanced) {
+        buildConnectionSettings(strings, isHidOnly, isExternal, advanced)
     }
-    val appearanceSettings = remember { buildAppearanceSettings(strings) }
-    val cameraSettings = remember { buildCameraSettings(strings) }
+    val appearanceSettings = remember(advanced) { buildAppearanceSettings(strings, advanced) }
+    val cameraSettings = remember(advanced) { buildCameraSettings(strings, advanced) }
     val scannerSettings =
-        remember(isHidOnly) { buildScannerSettings(strings, isHidOnly, context, scope) }
-    val aboutSettings = remember { buildAboutSettings(strings, context, uriHandler, scope) }
+        remember(isHidOnly, advanced) { buildScannerSettings(strings, isHidOnly, context, scope, advanced) }
+    val aboutSettings = remember(advanced) { buildAboutSettings(strings, context, uriHandler, scope, advanced) }
 
     LazyColumn(
         verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -132,23 +138,40 @@ fun SettingsContent() {
             .fillMaxSize()
             .padding(16.dp, 0.dp)
     ) {
-        item { SectionTitle(strings[R.string.profiles], true) }
-        items(profileSettings) { it() }
+        if (profileSettings.isNotEmpty()) {
+            item { SectionTitle(strings[R.string.profiles], true) }
+            items(profileSettings) { it() }
+        }
 
-        item { SectionTitle(strings[R.string.connection]) }
+        item { SectionTitle(strings[R.string.connection], profileSettings.isEmpty()) }
         items(connectionSettings) { it() }
 
         item { SectionTitle(strings[R.string.appearance]) }
         items(appearanceSettings) { it() }
 
-        item { SectionTitle(strings[R.string.camera]) }
-        items(cameraSettings) { it() }
+        if (cameraSettings.isNotEmpty()) {
+            item { SectionTitle(strings[R.string.camera]) }
+            items(cameraSettings) { it() }
+        }
 
         item { SectionTitle(strings[R.string.scanner]) }
         items(scannerSettings) { it() }
 
         item { SectionTitle(strings[R.string.about]) }
         items(aboutSettings) { it() }
+
+        item { Spacer(Modifier.height(16.dp)) }
+        item {
+            Box(Modifier.clip(RoundedCornerShape(16.dp))) {
+                SwitchPreference(
+                    title = strings[R.string.shihab_advanced],
+                    desc = strings[R.string.shihab_advanced_desc],
+                    icon = Icons.Default.Tune,
+                    checked = advanced,
+                ) { advanced = it }
+            }
+        }
+        item { Spacer(Modifier.height(16.dp)) }
     }
 }
 
@@ -164,8 +187,8 @@ fun SectionTitle(text: String, isStart: Boolean = false) {
     Spacer(Modifier.height(4.dp))
 }
 
-internal fun buildProfileSettings(): List<@Composable () -> Unit> = buildSettings {
-    add {
+internal fun buildProfileSettings(advanced: Boolean): List<@Composable () -> Unit> = buildSettings(advanced) {
+    addAdvanced {
         val activeProfile by ProfileManager.activeProfile.collectAsStateWithLifecycle()
         val dialogState = rememberDialogState()
 
@@ -183,8 +206,9 @@ internal fun buildProfileSettings(): List<@Composable () -> Unit> = buildSetting
 internal fun buildConnectionSettings(
     strings: SettingsStrings,
     isHidOnly: Boolean,
-    isExternal: Boolean
-): List<@Composable () -> Unit> = buildSettings {
+    isExternal: Boolean,
+    advanced: Boolean
+): List<@Composable () -> Unit> = buildSettings(advanced) {
     add {
         ComboBoxEnumPreference(
             title = strings[R.string.connection_mode],
@@ -238,7 +262,7 @@ internal fun buildConnectionSettings(
         )
     }
 
-    add {
+    addAdvanced {
         val customKeysDialog = rememberDialogState()
         CustomKeysDialog(customKeysDialog)
         ButtonPreference(
@@ -260,7 +284,7 @@ internal fun buildConnectionSettings(
         )
     }
 
-    add {
+    addAdvanced {
         val errorString = strings.errorTemplate
         val codeRegex = remember { Regex("\\{[^{}]*CODE[^{}]*\\}") }
         TextBoxPreference(
@@ -298,7 +322,7 @@ internal fun buildConnectionSettings(
         )
     }
 
-    add {
+    addAdvanced {
         SwitchPreference(
             title = strings[R.string.templates_in_value],
             desc = strings[R.string.template_in_value_desc],
@@ -322,23 +346,23 @@ internal fun buildConnectionSettings(
 //        icon = Icons.AutoMirrored.Filled.VolumeMute,
 //        preference = PreferenceStore.SEND_WITH_VOLUME
 //    )
-    add {
+    addAdvanced {
         VolumeKeyOptionsModal()
     }
 
-    add {
+    addAdvanced {
         JavaScriptOption()
     }
 
-    add {
+    addAdvanced {
         // External output plugin picker — available in every mode (parallel output toggle
         // for HID/RFCOMM lives inside it).
         ExternalPluginsModal()
     }
 }
 
-internal fun buildAppearanceSettings(strings: SettingsStrings): List<@Composable () -> Unit> =
-    buildSettings {
+internal fun buildAppearanceSettings(strings: SettingsStrings, advanced: Boolean): List<@Composable () -> Unit> =
+    buildSettings(advanced) {
         add {
             SwitchPreference(
                 title = strings[R.string.keep_screen_on],
@@ -348,7 +372,7 @@ internal fun buildAppearanceSettings(strings: SettingsStrings): List<@Composable
             )
         }
 
-        add {
+        addAdvanced {
             SwitchPreference(
                 title = strings[R.string.allow_screen_rotation],
                 desc = strings[R.string.allow_screen_rotation_desc],
@@ -357,7 +381,7 @@ internal fun buildAppearanceSettings(strings: SettingsStrings): List<@Composable
             )
         }
 
-        add {
+        addAdvanced {
             SwitchPreference(
                 title = strings[R.string.full_screen_scanner],
                 desc = strings[R.string.full_screen_scanner_desc],
@@ -377,7 +401,7 @@ internal fun buildAppearanceSettings(strings: SettingsStrings): List<@Composable
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            add {
+            addAdvanced {
                 SwitchPreference(
                     title = strings[R.string.dynamic_theme],
                     desc = strings[R.string.dynamic_theme_desc],
@@ -388,9 +412,9 @@ internal fun buildAppearanceSettings(strings: SettingsStrings): List<@Composable
         }
     }
 
-internal fun buildCameraSettings(strings: SettingsStrings): List<@Composable () -> Unit> =
-    buildSettings {
-        add {
+internal fun buildCameraSettings(strings: SettingsStrings, advanced: Boolean): List<@Composable () -> Unit> =
+    buildSettings(advanced) {
+        addAdvanced {
             SwitchPreference(
                 title = strings[R.string.front_camera],
                 desc = strings[R.string.front_camera_desc],
@@ -399,7 +423,7 @@ internal fun buildCameraSettings(strings: SettingsStrings): List<@Composable () 
             )
         }
 
-        add {
+        addAdvanced {
             ComboBoxEnumPreference(
                 title = strings[R.string.focus_mode],
                 desc = strings[R.string.focus_mode_desc],
@@ -409,7 +433,7 @@ internal fun buildCameraSettings(strings: SettingsStrings): List<@Composable () 
             )
         }
 
-        add {
+        addAdvanced {
             SwitchPreference(
                 title = strings[R.string.fix_exposure],
                 desc = strings[R.string.fix_exposure_desc],
@@ -418,7 +442,7 @@ internal fun buildCameraSettings(strings: SettingsStrings): List<@Composable () 
             )
         }
 
-        add {
+        addAdvanced {
             SwitchPreference(
                 title = strings[R.string.preview_performance_mode],
                 desc = strings[R.string.preview_mode_desc],
@@ -427,7 +451,7 @@ internal fun buildCameraSettings(strings: SettingsStrings): List<@Composable () 
             )
         }
 
-        add {
+        addAdvanced {
             SwitchPreference(
                 title = strings[R.string.preview_stabilization],
                 desc = strings[R.string.preview_stabilization_desc],
@@ -436,7 +460,7 @@ internal fun buildCameraSettings(strings: SettingsStrings): List<@Composable () 
             )
         }
 
-        add {
+        addAdvanced {
             ComboBoxEnumPreference(
                 title = strings[R.string.scan_res],
                 desc = strings[R.string.scan_res_desc],
@@ -446,7 +470,7 @@ internal fun buildCameraSettings(strings: SettingsStrings): List<@Composable () 
             )
         }
 
-        add {
+        addAdvanced {
             SliderPreference(
                 title = strings[R.string.initial_zoom],
                 desc = strings[R.string.initial_zoom_desc],
@@ -458,7 +482,7 @@ internal fun buildCameraSettings(strings: SettingsStrings): List<@Composable () 
             )
         }
 
-        add {
+        addAdvanced {
             CheckBoxPreference(
                 title = strings[R.string.zoom_gesture],
                 desc = strings[R.string.zoom_gesture_desc],
@@ -480,8 +504,9 @@ internal fun buildScannerSettings(
     strings: SettingsStrings,
     isHidMode: Boolean,
     context: Context,
-    scope: CoroutineScope
-): List<@Composable () -> Unit> = buildSettings {
+    scope: CoroutineScope,
+    advanced: Boolean
+): List<@Composable () -> Unit> = buildSettings(advanced) {
     add {
         CheckBoxPreference(
             title = strings[R.string.code_types],
@@ -493,11 +518,11 @@ internal fun buildScannerSettings(
         )
     }
 
-    add {
+    addAdvanced {
         AdvancedOptionsModal()
     }
 
-    add {
+    addAdvanced {
         SwitchPreference(
             title = strings[R.string.restrict_area],
             desc = strings[R.string.restrict_area_desc],
@@ -506,7 +531,7 @@ internal fun buildScannerSettings(
         )
     }
 
-    add {
+    addAdvanced {
         val errorString = strings.errorRegex
         TextBoxPreference(
             title = strings[R.string.filter_regex],
@@ -523,7 +548,7 @@ internal fun buildScannerSettings(
         )
     }
 
-    add {
+    addAdvanced {
         ComboBoxEnumPreference(
             title = strings[R.string.overlay_type],
             desc = strings[R.string.overlay_type_desc],
@@ -568,7 +593,7 @@ internal fun buildScannerSettings(
         preference = PreferenceStore.SHOW_POSSIBLE
     )*/
 
-    add {
+    addAdvanced {
         SwitchPreference(
             title = strings[R.string.full_inside],
             desc = strings[R.string.full_inside_desc],
@@ -605,7 +630,7 @@ internal fun buildScannerSettings(
         )
     }
 
-    add {
+    addAdvanced {
         SwitchPreference(
             title = strings[R.string.auto_copy_to_clipboard],
             desc = strings[R.string.auto_copy_to_clipboard_desc],
@@ -621,7 +646,7 @@ internal fun buildScannerSettings(
         preference = PreferenceStore.RAW_VALUE
     )*/
 
-    add {
+    addAdvanced {
         SwitchPreference(
             title = strings[R.string.clear_after_send],
             desc = strings[R.string.clear_after_send_desc],
@@ -630,7 +655,7 @@ internal fun buildScannerSettings(
         )
     }
 
-    add {
+    addAdvanced {
         SwitchPreference(
             title = strings[R.string.enable_undo_send],
             desc = strings[R.string.enable_undo_send_desc],
@@ -640,7 +665,7 @@ internal fun buildScannerSettings(
         )
     }
 
-    add {
+    addAdvanced {
         ComboBoxEnumPreference(
             title = strings[R.string.clear_after_time],
             desc = strings[R.string.clear_after_time_desc],
@@ -650,7 +675,7 @@ internal fun buildScannerSettings(
         )
     }
 
-    add {
+    addAdvanced {
         SwitchPreference(
             title = strings[R.string.private_mode],
             desc = strings[R.string.private_mode_desc],
@@ -659,7 +684,7 @@ internal fun buildScannerSettings(
         )
     }
 
-    add {
+    addAdvanced {
         SwitchPreference(
             title = strings[R.string.persistent_history],
             desc = strings[R.string.persistent_history_desc],
@@ -668,7 +693,7 @@ internal fun buildScannerSettings(
         )
     }
 
-    add {
+    addAdvanced {
         SwitchPreference(
             title = strings[R.string.multi_code_detection],
             desc = strings[R.string.multi_code_detection_desc],
@@ -677,7 +702,7 @@ internal fun buildScannerSettings(
         )
     }
 
-    add {
+    addAdvanced {
         SaveScanImageOptionsModal()
     }
 }
@@ -686,46 +711,11 @@ internal fun buildAboutSettings(
     strings: SettingsStrings,
     context: Context,
     uriHandler: UriHandler,
-    scope: CoroutineScope
-): List<@Composable () -> Unit> = buildSettings {
+    scope: CoroutineScope,
+    advanced: Boolean
+): List<@Composable () -> Unit> = buildSettings(advanced) {
     // Shihab: About (with the GPL notice), language, updates, problem report to Shihab App's support, source code.
-    BarcodeAbout.items().forEach { add(it) }
-
-    add {
-        ButtonPreference(
-            title = strings[R.string.rate],
-            desc = strings[R.string.rate_desc],
-            icon = Icons.Default.Star,
-        ) {
-            uriHandler.openUri("market://details?id=${context.packageName}")
-        }
-    }
-
-    add {
-        val shareVia = strings[R.string.share_via]
-        ButtonPreference(
-            title = strings[R.string.share],
-            desc = strings[R.string.share_desc],
-            icon = Icons.Default.Share,
-        ) {
-            runCatching {
-                context.startActivity(
-                    Intent.createChooser(
-                        Intent(Intent.ACTION_SEND).apply {
-                            putExtra(
-                                Intent.EXTRA_TEXT,
-                                "https://play.google.com/store/apps/details?id=${context.packageName}"
-                            )
-                            type = "text/plain"
-                        }, shareVia
-                    )
-                )
-            }.onFailure {
-                // Open page in browser instead
-                uriHandler.openUri("https://play.google.com/store/apps/details?id=${context.packageName}")
-            }
-        }
-    }
+    BarcodeAbout.items(advanced).forEach { add(it) }
 
     add {
         val versionString = remember {
@@ -807,11 +797,16 @@ internal class SettingsStrings(private val context: Context) {
         )
 }
 
-internal class SettingsBuilder {
+internal class SettingsBuilder(private val advanced: Boolean = true) {
     private val items = mutableListOf<@Composable () -> Unit>()
 
     fun add(content: @Composable () -> Unit) {
         items += content
+    }
+
+    /** Shihab: shown only with "Advanced settings" on; the simple screen keeps what data entry needs. */
+    fun addAdvanced(content: @Composable () -> Unit) {
+        if (advanced) items += content
     }
 
     fun build(): List<@Composable () -> Unit> =
@@ -836,8 +831,10 @@ internal class SettingsBuilder {
         }
 }
 
-private fun buildSettings(block: SettingsBuilder.() -> Unit): List<@Composable () -> Unit> =
-    SettingsBuilder().apply(block).build()
+private fun buildSettings(
+    advanced: Boolean = true,
+    block: SettingsBuilder.() -> Unit
+): List<@Composable () -> Unit> = SettingsBuilder(advanced).apply(block).build()
 
 @Composable
 @Preview

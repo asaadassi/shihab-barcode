@@ -175,7 +175,8 @@ fun UpdateScanAreas(
                     // Rectangle optimized for barcodes
                     OverlayType.RECTANGLE -> {
                         viewModel.scanRects = emptyList()
-                        val length = it.width * 0.8f
+                        // Shihab: narrower in landscape, so the session bar at the side stays clear of it
+                        val length = it.width * if (landscape) 0.4f else 0.8f
                         val height = (length * 0.45f).coerceAtMost(y * 0.8f)
                         Rect(
                             Offset(x - length / 2, y - height / 2),

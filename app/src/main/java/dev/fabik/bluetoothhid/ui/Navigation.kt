@@ -24,11 +24,12 @@ import dev.fabik.bluetoothhid.History
 import dev.fabik.bluetoothhid.LocalController
 import dev.fabik.bluetoothhid.R
 import dev.fabik.bluetoothhid.Scanner
+import dev.fabik.bluetoothhid.shihab.ConnectionStart
 import dev.fabik.bluetoothhid.ui.model.BarcodeResult
 import dev.fabik.bluetoothhid.utils.ConnectionMode
 import dev.fabik.bluetoothhid.utils.PreferenceStore
 import dev.fabik.bluetoothhid.utils.ZXingAnalyzer
-import dev.fabik.bluetoothhid.utils.getPreferenceStateBlocking
+import dev.fabik.bluetoothhid.utils.setPreference
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
@@ -36,6 +37,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 object Routes {
+    const val Start = "Start"  // Shihab: the connection choice, always the first screen
     const val Devices = "Devices"
     const val Main = "Main"
     const val History = "History"
@@ -55,11 +57,7 @@ fun NavGraph() {
     var canExit by remember { mutableStateOf(false) }
     val exitString = stringResource(R.string.exit_confirm)
 
-    // External mode has no Bluetooth device, so it starts directly on the scanner and the
-    // controller manages its own lifecycle (no disconnect on navigation).
     val context = LocalContext.current
-    val connectionMode by context.getPreferenceStateBlocking(PreferenceStore.CONNECTION_MODE)
-    val isExternal = connectionMode == ConnectionMode.EXTERNAL.ordinal
 
     // Handles shortcut to scanner/history
     val startDestination = remember {
@@ -80,17 +78,18 @@ fun NavGraph() {
         ?: remember { mutableStateOf(null) }
 
     CompositionLocalProvider(LocalNavigation provides navController) {
-        NavHost(
-            navController,
-            if (isExternal) Routes.Main else Routes.Devices
-        ) {
-            composable(Routes.Devices) {
-                LaunchedEffect(Unit) {
-                    controller?.disconnect()
-                }
-
-                Devices {
-                    navController.navigate(Routes.Main)
+        NavHost(navController, Routes.Start) {
+            // Shihab: Bluetooth goes on to the device list (or straight to the scanner when already
+            // connected); Wi-Fi/cable and direct reading have no Bluetooth device and open the scanner.
+            composable(Routes.Start) {
+                ConnectionStart { mode ->
+                    scope.launch {
+                        context.setPreference(PreferenceStore.CONNECTION_MODE, mode.ordinal)
+                        val bluetooth = mode == ConnectionMode.HID || mode == ConnectionMode.RFCOMM
+                        navController.navigate(
+                            if (bluetooth && currentDevice == null) Routes.Devices else Routes.Main
+                        ) { launchSingleTop = true }
+                    }
                 }
 
                 // Confirm back presses to exit the app
@@ -105,6 +104,16 @@ fun NavGraph() {
                             canExit = false
                         }
                     }
+                }
+            }
+
+            composable(Routes.Devices) {
+                LaunchedEffect(Unit) {
+                    controller?.disconnect()
+                }
+
+                Devices {
+                    navController.navigate(Routes.Main)
                 }
             }
 
@@ -125,20 +134,6 @@ fun NavGraph() {
                             imageName = result.imageName,
                             regexGroups = result.regexGroups
                         )
-                    }
-                }
-
-                // In External mode back exits the app instead of returning to Devices
-                BackHandler(enabled = isExternal) {
-                    if (canExit) {
-                        activity?.finishAfterTransition()
-                    } else {
-                        canExit = true
-                        Toast.makeText(activity, exitString, Toast.LENGTH_SHORT).show()
-                        scope.launch {
-                            delay(2000)
-                            canExit = false
-                        }
                     }
                 }
 
@@ -170,8 +165,9 @@ fun NavGraph() {
 
     // Listen for changes in the current device
     LaunchedEffect(currentDevice) {
-        // When connected to a device, navigate to the scanner
-        if (currentDevice != null) {
+        // When connected to a device from the device list, navigate to the scanner
+        // (Shihab: not from the start screen, where the user still chooses the connection)
+        if (currentDevice != null && navController.currentDestination?.route == Routes.Devices) {
             // Single-top is used to avoid creating multiple instances of the scanner
             navController.navigate(Routes.Main) {
                 popUpTo(Routes.Devices)

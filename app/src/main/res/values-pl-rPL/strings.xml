@@ -226,6 +226,7 @@
         <item>Szybko (100ms)</item>
         <item>Normalnie (500ms)</item>
         <item>Wolno (1s)</item>
+        <item>5 s między odczytami</item>
     </string-array>
     <string-array name="scan_res_values">
         <item>SD (480P)</item>

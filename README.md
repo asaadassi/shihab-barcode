@@ -29,3 +29,19 @@ Release signing reads `keystore.properties` at the project root (not in source c
 
 Version: `appVersionName` / `appVersionCode` in [app/build.gradle.kts](app/build.gradle.kts) (SemVer).
 Known errors: [ERRORS.md](ERRORS.md). Privacy: [PRIVACY.md](PRIVACY.md). Changes: [CHANGELOG.md](CHANGELOG.md).
+
+Icons: [branding/barcode-logo.svg](branding/barcode-logo.svg) is the only source; run `branding\make-icons.ps1` to regenerate
+the launcher, store, notification and monochrome icons.
+
+## Barcode Receiver (Windows) · مستقبل الحاسوب
+
+[windows/](windows/) holds the Windows side: it receives scans over Wi-Fi, the USB cable (adb reverse) or Bluetooth
+(RFCOMM) and types them into the active window, followed by Enter. Protocol: [docs/PC-LINK.md](docs/PC-LINK.md);
+known errors: [windows/ERRORS.md](windows/ERRORS.md).
+
+```powershell
+powershell -ExecutionPolicy Bypass -File windows\scripts\build-all.ps1   # tests, version, installer in windows\releases
+```
+
+Needs .NET 8 SDK, Inno Setup 6, the Shihab shared libraries next to this folder, and the Android SDK platform-tools
+(adb) at `D:\AndroidSdk\platform-tools` or `-p:AdbDir=<path>`.

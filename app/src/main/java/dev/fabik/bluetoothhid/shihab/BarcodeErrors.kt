@@ -25,6 +25,14 @@ object BarcodeErrors {
         "لا يوجد تطبيق بريد على الجوال لإرسال التقرير.", "There is no email app on the phone to send the report.",
         "ثبّت تطبيق بريد، أو راسل الدعم من جهاز آخر.", "Install an email app, or write to support from another device.")
 
+    val PC_REFUSED = CommonError("BCD-005", "The PC refused the pairing key (it made a new pairing code)",
+        "رفض الحاسوب هذا الجوال.", "The PC refused this phone.",
+        "امسح رمز الاقتران الظاهر الآن في باركود على الحاسوب.", "Scan the pairing code shown now in Barcode on the PC.")
+
+    val PC_NOT_TYPED = CommonError("BCD-006", "The PC received a scan but could not type it (a key held down, or an administrator window)",
+        "وصل الرمز إلى الحاسوب لكنه لم يُكتب.", "The PC got the code but could not type it.",
+        "انقر داخل خانة الإدخال على الحاسوب وامسح مرة أخرى.", "Click into the input field on the PC and scan again.")
+
     /** "message · BCD-00x" in the app language, as shown on screen and quoted to support. */
     fun text(ctx: Context, e: CommonError): String =
         if (ShihabLang.isArabic(ctx)) "${e.ar} ${e.fixAr}  · ${e.code}" else "${e.en} ${e.fixEn}  · ${e.code}"

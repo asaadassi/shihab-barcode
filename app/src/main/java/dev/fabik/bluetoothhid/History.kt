@@ -1,6 +1,22 @@
 package dev.fabik.bluetoothhid
 
 import android.app.Activity
+import android.content.ClipData
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Computer
+import androidx.compose.material.icons.filled.Timelapse
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalResources
+import androidx.core.content.FileProvider
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.fabik.bluetoothhid.bt.BluetoothController
+import dev.fabik.bluetoothhid.utils.ConnectionMode
+import dev.fabik.bluetoothhid.utils.ZXingAnalyzer
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.first
+import java.time.LocalDateTime
 import android.content.Intent
 import android.util.Log
 import android.widget.Toast
@@ -137,6 +153,7 @@ fun HistoryViewModel.HistoryContent(onClick: (HistoryViewModel.HistoryEntry) -> 
     }
 
     val types = stringArrayResource(R.array.code_types_values)
+    val copyValue = rememberCopyValue()
 
     LazyColumn(Modifier.fillMaxSize()) {
         items(filteredHistory, key = { it.hashCode() }) { barcode ->
@@ -152,13 +169,20 @@ fun HistoryViewModel.HistoryContent(onClick: (HistoryViewModel.HistoryEntry) -> 
                 supportingContent = {
                     Text(types.getOrNull(barcode.format) ?: "UNKNOWN")
                 },
+                trailingContent = {
+                    val sendAgain = stringResource(R.string.shihab_send_again)
+                    IconButton(onClick = { onClick(barcode) }, Modifier.tooltip(sendAgain)) {
+                        Icon(Icons.AutoMirrored.Filled.Send, sendAgain)
+                    }
+                },
                 tonalElevation = if (isSelected) 8.0.dp else 0.0.dp,
                 modifier = Modifier
                     .animateItem()
                     .combinedClickable(onLongClick = {
                         setItemSelected(barcode, true)
                     }, onClick = {
-                        onClick(barcode)
+                        // While selecting, a tap only toggles the selection (handled below)
+                        if (!isSelecting) copyValue(barcode.value)
                     })
                     .then(
                         if (isSelecting) {
@@ -222,6 +246,17 @@ private fun HistoryViewModel.HistoryTopBar(
                 Icon(
                     if (isSearching) Icons.Outlined.Close
                     else Icons.Default.Search, "Search"
+                )
+            }
+            val sessionOnlyLabel = stringResource(R.string.shihab_session_only)
+            IconButton(
+                onClick = { sessionOnly = !sessionOnly },
+                Modifier.tooltip(sessionOnlyLabel)
+            ) {
+                Icon(
+                    Icons.Default.Timelapse, sessionOnlyLabel,
+                    tint = if (sessionOnly) MaterialTheme.colorScheme.primary
+                    else LocalContentColor.current
                 )
             }
             FilterModal(filteredTypes.toSet(), filterDateStart, filterDateEnd) { sel, a, b ->
@@ -347,8 +382,10 @@ fun AppBarTextField(
 
 @Composable
 @ExperimentalMaterial3Api
-fun HistoryViewModel.ExportSheet() {
+fun HistoryViewModel.ExportSheet(trigger: (@Composable (open: () -> Unit) -> Unit)? = null) {
     val context = LocalContext.current
+    val resources = LocalResources.current
+    val controller = LocalController.current
 
     val exportString = stringResource(R.string.export)
     val types = stringArrayResource(R.array.code_types_values)
@@ -359,6 +396,13 @@ fun HistoryViewModel.ExportSheet() {
     var showSheet by rememberSaveable { mutableStateOf(false) }
     var exportData by rememberSaveable { mutableStateOf("") }
 
+    // Typing on the computer needs a link: a Bluetooth device, the PC receiver, or External mode (plugins)
+    val currentDevice by controller?.currentDevice?.collectAsStateWithLifecycle()
+        ?: remember { mutableStateOf(null) }
+    val connectionMode by context.getPreferenceState(PreferenceStore.CONNECTION_MODE)
+    val canType = currentDevice != null || connectionMode == ConnectionMode.EXTERNAL.ordinal ||
+            connectionMode == ConnectionMode.PC.ordinal
+
     // Additional MIME aliases for CSV (in many providers)
     val CSV_MIME_CANDIDATES = arrayOf(
         "text/csv",
@@ -368,18 +412,23 @@ fun HistoryViewModel.ExportSheet() {
         "application/vnd.msexcel"
     )
 
-    ExtendedFloatingActionButton(
-        text = {
-            Text(
-                if (isSelecting) pluralStringResource(
-                    R.plurals.export_items, selectionSize, selectionSize
-                ) else stringResource(R.string.export),
-                modifier = Modifier.animateContentSize(),
-            )
-        },
-        icon = { Icon(Icons.Default.FileDownload, stringResource(R.string.export)) },
-        onClick = { showSheet = true }
-    )
+    val open = { showSheet = true }
+    if (trigger != null) {
+        trigger(open)
+    } else {
+        ExtendedFloatingActionButton(
+            text = {
+                Text(
+                    if (isSelecting) pluralStringResource(
+                        R.plurals.export_items, selectionSize, selectionSize
+                    ) else stringResource(R.string.export),
+                    modifier = Modifier.animateContentSize(),
+                )
+            },
+            icon = { Icon(Icons.Default.FileDownload, stringResource(R.string.export)) },
+            onClick = open
+        )
+    }
 
     val startForResult =
         rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -405,58 +454,118 @@ fun HistoryViewModel.ExportSheet() {
             sheetState = state,
             onDismissRequest = { showSheet = false },
             content = {
-                ExportSheetContent { typ, dedup, saveToFile ->
-                    scope.launch { state.hide() }.invokeOnCompletion { showSheet = state.isVisible }
+                ExportSheetContent(
+                    onSelect = { typ, dedup, saveToFile ->
+                        scope.launch { state.hide() }.invokeOnCompletion { showSheet = state.isVisible }
 
-                    val data = exportHistory(typ, dedup, types)
+                        // A byte order mark lets Excel on the computer read Arabic text in a CSV correctly
+                        val data = exportHistory(typ, dedup, types)
+                            .let { if (typ == HistoryViewModel.ExportType.CSV) "﻿$it" else it }
 
-                    // (baseMime for picker, filename, extraMimeTypes [for CSV])
-                    val params: Triple<String, String, Array<String>?> = when (typ) {
-                        HistoryViewModel.ExportType.CSV   -> Triple("*/*",            "export.csv", CSV_MIME_CANDIDATES)
-                        HistoryViewModel.ExportType.JSON  -> Triple("application/json","export.json", null)
-                        HistoryViewModel.ExportType.XML   -> Triple("text/xml",        "export.xml",  null)
-                        HistoryViewModel.ExportType.LINES -> Triple("text/plain",      "export.txt",  null)
-                    }
-                    val (baseMime, fileName, extraMimes) = params
-
-                    runCatching {
-                        if (saveToFile) {
-                            val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-                                addCategory(Intent.CATEGORY_OPENABLE)
-                                type = baseMime
-                                putExtra(Intent.EXTRA_TITLE, fileName)
-                                extraMimes?.let { putExtra(Intent.EXTRA_MIME_TYPES, it) }
-                            }
-                            exportData = data
-                            startForResult.launch(intent)
-                        } else {
-                            // For share use cannonical MIME
-                            val shareMime = when (typ) {
-                                HistoryViewModel.ExportType.CSV   -> "*/*"
-                                HistoryViewModel.ExportType.JSON  -> "application/json"
-                                HistoryViewModel.ExportType.XML   -> "text/xml"
-                                HistoryViewModel.ExportType.LINES -> "text/plain"
-                            }
-                            val intent = Intent(Intent.ACTION_SEND).apply {
-                                type = shareMime
-                                putExtra(Intent.EXTRA_TEXT, data)
-                            }
-                            val shareIntent = Intent.createChooser(intent, exportString)
-                            context.startActivity(shareIntent)
+                        // (baseMime for picker, extension, extraMimeTypes [for CSV])
+                        val params: Triple<String, String, Array<String>?> = when (typ) {
+                            HistoryViewModel.ExportType.CSV   -> Triple("*/*",             "csv",  CSV_MIME_CANDIDATES)
+                            HistoryViewModel.ExportType.JSON  -> Triple("application/json", "json", null)
+                            HistoryViewModel.ExportType.XML   -> Triple("text/xml",         "xml",  null)
+                            HistoryViewModel.ExportType.LINES -> Triple("text/plain",       "txt",  null)
                         }
-                    }.onFailure {
-                        Log.e("History", "Error starting activity!", it)
-                    }
-                }
+                        val (baseMime, extension, extraMimes) = params
+                        val fileName = "barcode-${EXPORT_STAMP.format(LocalDateTime.now())}.$extension"
+
+                        runCatching {
+                            if (saveToFile) {
+                                val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                                    addCategory(Intent.CATEGORY_OPENABLE)
+                                    type = baseMime
+                                    putExtra(Intent.EXTRA_TITLE, fileName)
+                                    extraMimes?.let { putExtra(Intent.EXTRA_MIME_TYPES, it) }
+                                }
+                                exportData = data
+                                startForResult.launch(intent)
+                            } else {
+                                // Shared as a file, not as text, so it can reach a computer (Quick Share, email, WhatsApp)
+                                val shareMime = when (typ) {
+                                    HistoryViewModel.ExportType.CSV   -> "text/csv"
+                                    HistoryViewModel.ExportType.JSON  -> "application/json"
+                                    HistoryViewModel.ExportType.XML   -> "text/xml"
+                                    HistoryViewModel.ExportType.LINES -> "text/plain"
+                                }
+                                val dir = context.cacheDir.resolve("export")
+                                // Earlier exports were already handed over: only the newest is kept
+                                dir.deleteRecursively()
+                                dir.mkdirs()
+                                val file = dir.resolve(fileName)
+                                file.writeText(data)
+                                val uri = FileProvider.getUriForFile(
+                                    context, "${context.packageName}.fileprovider", file
+                                )
+                                val intent = Intent(Intent.ACTION_SEND).apply {
+                                    type = shareMime
+                                    putExtra(Intent.EXTRA_STREAM, uri)
+                                    clipData = ClipData.newRawUri(fileName, uri)
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                val shareIntent = Intent.createChooser(intent, exportString)
+                                context.startActivity(shareIntent)
+                            }
+                        }.onFailure {
+                            Log.e("History", "Error starting activity!", it)
+                        }
+                    },
+                    onTypeOnComputer = if (controller != null && canType) { dedup ->
+                        scope.launch { state.hide() }.invokeOnCompletion { showSheet = state.isVisible }
+
+                        val entries = entriesToExport(dedup)
+                        val message = if (typeOnComputer(controller, entries)) {
+                            resources.getString(R.string.shihab_type_on_pc_started, entries.size)
+                        } else {
+                            resources.getString(R.string.shihab_type_on_pc_busy)
+                        }
+                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                    } else null
+                )
             }
         )
     }
+}
+
+private val EXPORT_STAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmm", Locale.ROOT)
+
+// One typing run at a time, so two runs never mix their lines on the computer
+private var typingJob: Job? = null
+
+/**
+ * Types each entry on the computer through the current link, followed by the usual suffix (Enter by
+ * default), so the readings fill a column in Excel or any field one after another.
+ *
+ * @return false when an earlier run is still typing
+ */
+private fun typeOnComputer(
+    controller: BluetoothController,
+    entries: List<HistoryViewModel.HistoryEntry>
+): Boolean {
+    if (typingJob?.isActive == true) return false
+    typingJob = CoroutineScope(Dispatchers.IO).launch {
+        entries.forEach { entry ->
+            // sendString drops a value while another one is being typed: wait until the link is free
+            controller.isSending.first { !it }
+            controller.sendString(
+                entry.value,
+                true,
+                "HISTORY",
+                entry.timestamp,
+                ZXingAnalyzer.index2String(entry.format)
+            )
+        }
+    }
+    return true
 }
 
 @Composable
 @Preview
 private fun ExportSheetContent(
     onSelect: (HistoryViewModel.ExportType, Boolean, Boolean) -> Unit = { _, _, _ -> },
+    onTypeOnComputer: ((Boolean) -> Unit)? = null,
 ) {
     var (deduplicateChecked, setDeduplicate) = rememberSaveable { mutableStateOf(true) }
     var (saveIntoFileChecked, setSaveIntoFile) = rememberSaveable { mutableStateOf(true) }
@@ -518,9 +627,38 @@ private fun ExportSheetContent(
                         .clip(MaterialTheme.shapes.medium)
                 )
             }
+
+            onTypeOnComputer?.let { onType ->
+                item {
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.shihab_type_on_pc)) },
+                        supportingContent = { Text(stringResource(R.string.shihab_type_on_pc_desc)) },
+                        leadingContent = { Icon(Icons.Default.Computer, null) },
+                        modifier = Modifier
+                            .clickable { onType(deduplicateChecked) }
+                            .clip(MaterialTheme.shapes.medium)
+                    )
+                }
+            }
         }
 
         Spacer(Modifier.height(16.dp))
+    }
+}
+
+/** Copies one value to the clipboard and says so. */
+@Composable
+fun rememberCopyValue(): (String) -> Unit {
+    val context = LocalContext.current
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
+    val copied = stringResource(R.string.copied_to_clipboard)
+
+    return remember(clipboard, copied) {
+        { value ->
+            scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("", value))) }
+            Toast.makeText(context, copied, Toast.LENGTH_SHORT).show()
+        }
     }
 }
 

@@ -33,6 +33,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import dev.fabik.bluetoothhid.shihab.PcLink
+import dev.fabik.bluetoothhid.utils.setPreference
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -57,6 +59,9 @@ class BluetoothController(var context: Context) {
 
     // External-output integration: forwards scans to companion/extension apps via broadcast
     private val externalController = ExternalController(context)
+
+    // Shihab: the PC link (Barcode Receiver on Windows, Wi-Fi or USB cable). Lazy: controllerScope is declared below.
+    val pcLink by lazy { PcLink(context, controllerScope) }
 
     // Last delivery status reported back by an extension (for optional UI feedback)
     val externalLastResultFlow = externalController.lastResultFlow
@@ -88,6 +93,7 @@ class BluetoothController(var context: Context) {
     private var currentConnectionMode: ConnectionMode = ConnectionMode.HID
 
     private val isExternalMode get() = currentConnectionMode == ConnectionMode.EXTERNAL
+    private val isPcMode get() = currentConnectionMode == ConnectionMode.PC
     private lateinit var preferences: Map<PreferenceStore.Preference<*>, *>
 
     var keyboardSender: KeyboardSender? = null
@@ -210,7 +216,8 @@ class BluetoothController(var context: Context) {
         override fun onAppStatusChanged(pluggedDevice: BluetoothDevice?, registered: Boolean) {
             super.onAppStatusChanged(pluggedDevice, registered)
 
-            if (registered && autoConnectEnabled) {
+            // Shihab: auto connect only as a Bluetooth keyboard; PC and read-only modes need no Bluetooth device.
+            if (registered && autoConnectEnabled && currentConnectionMode == ConnectionMode.HID) {
                 if (pluggedDevice != null) {
                     Log.d(TAG, "onAppStatusChanged: connecting with $pluggedDevice")
                     hidDevice?.connect(pluggedDevice)
@@ -267,6 +274,7 @@ class BluetoothController(var context: Context) {
             ).distinctUntilChanged().debounce(200).collect {
                 val mode = PreferenceStore.CONNECTION_MODE.extractEnum(it)
                 if (currentConnectionMode != mode) {
+                    if (mode != ConnectionMode.PC) pcLink.stop()
                     when (mode) {
                         ConnectionMode.RFCOMM -> {
                             Log.d(TAG, "Switching to RFCOMM mode")
@@ -282,6 +290,22 @@ class BluetoothController(var context: Context) {
                             // "connected to <device>".
                             hostDevice.value?.let { hidDevice?.disconnect(it) }
                             hostDevice.update { null }
+                        }
+
+                        ConnectionMode.LOCAL -> {
+                            Log.d(TAG, "Switching to read-only mode")
+                            rfcommController.disconnectRFCOMM()
+                            hostDevice.value?.let { hidDevice?.disconnect(it) }
+                            hostDevice.update { null }
+                        }
+
+                        ConnectionMode.PC -> {
+                            Log.d(TAG, "Switching to PC mode")
+                            rfcommController.disconnectRFCOMM()
+                            // Like External: no Bluetooth peer, the PC link carries the scans.
+                            hostDevice.value?.let { hidDevice?.disconnect(it) }
+                            hostDevice.update { null }
+                            pcLink.start()
                         }
 
                         ConnectionMode.HID -> {
@@ -404,6 +428,7 @@ class BluetoothController(var context: Context) {
         if (currentConnectionMode == ConnectionMode.EXTERNAL) {
             externalController.start()
         }
+        if (isPcMode) pcLink.start()
 
         return bluetoothAdapter?.getProfileProxy(
             context,
@@ -441,6 +466,7 @@ class BluetoothController(var context: Context) {
 
         // Disconnect RFCOMM
         rfcommController.disconnectRFCOMM()
+        pcLink.stop()
 
         // In External mode there is no device — just stop forwarding
         if (isExternalMode || PreferenceStore.ENABLE_EXTERNAL_OUTPUT.extract(preferences)) {
@@ -593,6 +619,25 @@ class BluetoothController(var context: Context) {
             return@with
         }
 
+        // Shihab: the pairing QR code of Barcode Receiver is never typed: it pairs this phone and switches to PC mode.
+        if (string.startsWith(PcLink.PREFIX)) {
+            try {
+                val paired = pcLink.pair(string)
+                if (paired != null) setPreference(PreferenceStore.CONNECTION_MODE, ConnectionMode.PC.ordinal)
+                MainScope().launch {
+                    Toast.makeText(
+                        context,
+                        if (paired != null) getString(R.string.shihab_pc_paired, paired.pcName)
+                        else getString(R.string.shihab_pc_bad_code),
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            } finally {
+                _isSending.update { false }
+            }
+            return@with
+        }
+
         try {
             val sendDelay = PreferenceStore.SEND_DELAY.extract(preferences)
             val extraKeys =
@@ -664,7 +709,27 @@ class BluetoothController(var context: Context) {
                             imageName,
                             regexGroups
                         )
-                    rfcommController.sendProcessedData(processedString)
+                    // Shihab: the extra key (Enter = "\n") ends each scan, as for External: the receiver needs it.
+                    rfcommController.sendProcessedData(
+                        extraKeys.suffix?.let { processedString + it } ?: processedString
+                    )
+                }
+
+                ConnectionMode.PC -> {
+                    val processedString =
+                        if (directlyApplyTemplate) string else TemplateProcessor.processTemplate(
+                            string,
+                            template,
+                            TemplateProcessor.TemplateMode.RFCOMM,
+                            from,
+                            scanTimestamp,
+                            scannerID,
+                            barcodeType,
+                            preserveUnsupported,
+                            imageName,
+                            regexGroups
+                        )
+                    pcLink.send(extraKeys.suffix?.let { processedString + it } ?: processedString)
                 }
 
                 ConnectionMode.HID -> {
@@ -697,6 +762,10 @@ class BluetoothController(var context: Context) {
 
                 ConnectionMode.EXTERNAL -> {
                     // No Bluetooth output — the scan was already published to plugins above.
+                }
+
+                ConnectionMode.LOCAL -> {
+                    // Read only: the scan is already in the history, nothing is sent.
                 }
             }
         } finally {

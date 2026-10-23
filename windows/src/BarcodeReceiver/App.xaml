@@ -1,0 +1,51 @@
+<Application x:Class="BarcodeReceiver.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             ShutdownMode="OnExplicitShutdown">
+    <Application.Resources>
+        <ResourceDictionary>
+            <!-- Shihab.Common's ShihabTheme (colour tokens, Almarai, buttons, cards, combo boxes) -->
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/Shihab.Common;component/UI/ShihabTheme.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <Style TargetType="ComboBox" BasedOn="{StaticResource ShihabComboBox}" />
+            <Style TargetType="ComboBoxItem" BasedOn="{StaticResource ShihabComboBoxItem}" />
+
+            <Style x:Key="H1" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="20" />
+                <Setter Property="FontWeight" Value="Bold" />
+                <Setter Property="Foreground" Value="{DynamicResource Text}" />
+            </Style>
+            <Style x:Key="H2" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="15" />
+                <Setter Property="FontWeight" Value="Bold" />
+                <Setter Property="Foreground" Value="{DynamicResource Text}" />
+                <Setter Property="Margin" Value="0,0,0,10" />
+            </Style>
+            <Style x:Key="MutedText" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="12.5" />
+                <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+                <Setter Property="LineHeight" Value="20" />
+            </Style>
+            <!-- Icon glyph: its box never smaller than the font size + 6 (no clipped icons) -->
+            <Style x:Key="Glyph" TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="{DynamicResource Icons}" />
+                <Setter Property="FontSize" Value="16" />
+                <Setter Property="MinWidth" Value="22" />
+                <Setter Property="MinHeight" Value="22" />
+                <Setter Property="TextAlignment" Value="Center" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+            </Style>
+            <!-- A link row: icon, name, state -->
+            <Style x:Key="LinkRow" TargetType="Border">
+                <Setter Property="Background" Value="{DynamicResource Control}" />
+                <Setter Property="CornerRadius" Value="10" />
+                <Setter Property="Padding" Value="12,10" />
+                <Setter Property="Margin" Value="0,0,0,8" />
+            </Style>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

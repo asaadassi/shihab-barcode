@@ -97,7 +97,7 @@ class BluetoothService : Service() {
         val notification = Notification.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.bt_hid_service))
             .setContentText(getString(R.string.service_running))
-            .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
+            .setSmallIcon(R.drawable.ic_stat_logo)
             .setCategory(Notification.CATEGORY_SERVICE)
             .setContentIntent(pendingIntent)
             .build()

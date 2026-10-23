@@ -24,8 +24,8 @@ val keystoreProps = Properties().apply {
 
 // Product settings in one place (rule 28): the version, the upstream release this build is based on, and the
 // addresses shown in About.
-val appVersionName = "1.0.0"
-val appVersionCode = 1
+val appVersionName = "1.3.1"
+val appVersionCode = 7
 val upstreamVersion = "2.3.2"
 val upstreamSourceUrl = "https://github.com/Fabi019/hid-barcode-scanner"
 // The public repository holding this app's own source code (GPL-3.0).

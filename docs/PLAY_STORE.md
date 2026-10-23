@@ -20,7 +20,7 @@
 4. **الجمهور المستهدف**: 18+ (أداة عمل)، وليس موجّهاً للأطفال.
 5. **الإعلانات**: لا يحتوي إعلانات.
 6. **صفحة المتجر**: النصوص جاهزة في `metadata/ar` و `metadata/en-US` (العنوان، الوصف القصير، الوصف الكامل).
-   - الأيقونة 512×512: `C:\Users\Asaad\.claude\brand\default-icon.png`.
+   - الأيقونة 512×512: `app/src/main/ic_launcher-playstore.png` (تُولَّد من `branding/barcode-logo.svg` بـ `branding/make-icons.ps1`).
    - صورة الميزة 1024×500 ولقطات الشاشة: **لم تُجهَّز بعد** (صورة `metadata/en-US/images/featureGraphic.jpg`
      تخص التطبيق الأصلي ولا تُستخدم).
 7. **الإصدار ← الاختبار الداخلي** أولاً: ارفع ملف AAB، واكتب ملاحظات الإصدار من `metadata/ar/changelogs/1.txt`،

@@ -283,6 +283,7 @@
         <item>Rápida (100ms)</item>
         <item>Normal (500ms)</item>
         <item>Lenta (1s)</item>
+        <item>5 s entre leituras</item>
     </string-array>
     <string-array name="scan_res_values">
         <item>SD (480P)</item>

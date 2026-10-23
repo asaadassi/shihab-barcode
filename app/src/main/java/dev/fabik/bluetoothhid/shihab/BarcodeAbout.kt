@@ -78,13 +78,13 @@ object BarcodeAbout {
         prefs = ctx.applicationContext.getSharedPreferences("update", Context.MODE_PRIVATE),
     ).also { updaterInstance = it }
 
-    /** The settings items, in the order they are shown. */
-    fun items(): List<@Composable () -> Unit> = buildList {
+    /** The settings items, in the order they are shown; the source and licence links (also in About) are advanced. */
+    fun items(advanced: Boolean): List<@Composable () -> Unit> = buildList {
         add { AboutItem() }
         add { LanguageItem() }
         if (BuildConfig.SELF_UPDATE) add { UpdateItem() }
         add { ReportItem() }
-        add { SourceItem() }
+        if (advanced) add { SourceItem() }
     }
 
     @Composable

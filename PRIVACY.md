@@ -9,10 +9,10 @@ connected over Bluetooth. **It does not collect or transmit any personal data.**
 
 ## What leaves the phone · ما يخرج من الجوال
 
-| Build | Internet | Data |
+| What | When | Data |
 |---|---|---|
-| Google Play (`play`) | none: no `INTERNET` permission | nothing |
-| GitHub APK (`direct`) | only when checking for updates | a request to the public GitHub releases repository `asaadassi/shihab-barcode-releases` (GitHub sees the phone's IP address and the app version in the User-Agent) |
+| PC link (both builds) | only in "PC: Wi-Fi or USB cable" mode | each scan, the phone's name and a random install id, encrypted (TLS) to the paired PC on the local network or the USB cable; nothing goes to the internet |
+| Update check (GitHub APK, `direct`) | when you check for updates | a request to the public GitHub releases repository `asaadassi/shihab-barcode-releases` (GitHub sees the phone's IP address and the app version in the User-Agent) |
 
 - **Problem report** (both builds): only when you tap it, your own email app opens a message to
   support@shihab.app with the app version, Android version, phone model and the last lines of the app's error log.
@@ -26,9 +26,9 @@ Contact · التواصل: support@shihab.app · https://shihab.app/
 The following table explains all the permissions that are used. Some permissions (marked with legacy) are only required on older Android versions and not relevant on newer devices.
 
 > [!IMPORTANT]
-> The app **does not require internet access** to function. The Google Play build requests no internet permission;
-> the GitHub build adds `android.permission.INTERNET` and `android.permission.REQUEST_INSTALL_PACKAGES` for the
-> in-app update only (the system installer always asks before installing).
+> The app **does not require internet access** to function. `android.permission.INTERNET` is used for the PC link on
+> the local network or the USB cable, and in the GitHub build for the update check, which also adds
+> `android.permission.REQUEST_INSTALL_PACKAGES` (the system installer always asks before installing).
 
 
 | Permission                                                                     | Purpose                         | Explanation                                                                                                         |

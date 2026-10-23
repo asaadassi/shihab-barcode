@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-6 -6 152 152">
+  <!-- Master icon: a barcode inside an open, round-cornered viewfinder. Every app icon is generated from this file
+       by make-icons.ps1; edit here, never the PNGs. -->
+  <defs>
+    <linearGradient id="brand" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="140" y2="0">
+      <stop offset="0" stop-color="#F08FC4"/>
+      <stop offset="0.5" stop-color="#EF5285"/>
+      <stop offset="1" stop-color="#C06AAF"/>
+    </linearGradient>
+  </defs>
+  <g fill="url(#brand)">
+    <path d="M0 52V34A34 34 0 0 1 34 0H52A6 6 0 0 1 52 12H34A22 22 0 0 0 12 34V52A6 6 0 0 1 0 52Z M140 52V34A34 34 0 0 0 106 0H88A6 6 0 0 0 88 12H106A22 22 0 0 1 128 34V52A6 6 0 0 0 140 52Z M0 88V106A34 34 0 0 0 34 140H52A6 6 0 0 0 52 128H34A22 22 0 0 1 12 106V88A6 6 0 0 0 0 88Z M140 88V106A34 34 0 0 1 106 140H88A6 6 0 0 1 88 128H106A22 22 0 0 0 128 106V88A6 6 0 0 1 140 88Z"/>
+    <path d="M30 43A5 5 0 0 1 40 43V97A5 5 0 0 1 30 97Z M46 41A3 3 0 0 1 52 41V99A3 3 0 0 1 46 99Z M58 44A6 6 0 0 1 70 44V96A6 6 0 0 1 58 96Z M76 41A3 3 0 0 1 82 41V99A3 3 0 0 1 76 99Z M88 43A5 5 0 0 1 98 43V97A5 5 0 0 1 88 97Z M104 41A3 3 0 0 1 110 41V99A3 3 0 0 1 104 99Z"/>
+  </g>
+</svg>

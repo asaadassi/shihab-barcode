@@ -92,6 +92,9 @@ import kotlin.math.min
 class CameraViewModel : ViewModel() {
     companion object {
         const val TAG = "CameraViewModel"
+
+        // Rapid mode: how long a code must be out of sight before reading it again counts
+        const val RAPID_REPEAT_GAP_MS = 800L
     }
 
     // Used to set up a link between the Camera and your UI.
@@ -118,9 +121,10 @@ class CameraViewModel : ViewModel() {
     var onBarcodeDetected: (String?, BarcodeReader.Format, ImageProxy?, List<String>) -> Unit =
         { _, _, _, _ -> }
 
-    var scanRect = Rect.Zero
+    // Shihab: observable, so the overlay is redrawn when the frame moves (after turning the phone)
+    var scanRect by mutableStateOf(Rect.Zero)
     // For CUSTOM overlay with multiple areas: individual rects for filtering, empty = use scanRect
-    var scanRects: List<Rect> = emptyList()
+    var scanRects by mutableStateOf<List<Rect>>(emptyList())
     private val _areas = MutableStateFlow<List<ScanAreaData>>(emptyList())
     val areas = _areas.asStateFlow()
     var overlayPosition by mutableStateOf<Offset?>(null)
@@ -160,6 +164,7 @@ class CameraViewModel : ViewModel() {
         perfMode: Boolean,
         stabilization: Boolean,
         initialZoom: Float,
+        rotation: Int,
         onCameraReady: (CameraControl?, CameraInfo?, ImageCapture?) -> Unit,
         onBarcode: (BarcodeResult?) -> Unit,
     ) {
@@ -167,7 +172,7 @@ class CameraViewModel : ViewModel() {
         val processCameraProvider = ProcessCameraProvider.awaitInstance(appContext)
 
         _initialZoom = initialZoom
-        onBarcodeDetected = { value, format, image, regexGroups ->
+        onBarcodeDetected = detected@{ value, format, image, regexGroups ->
             lastDetectionTime = System.currentTimeMillis()
             if (value == null) {
                 if (lastBarcode != null) {
@@ -210,6 +215,15 @@ class CameraViewModel : ViewModel() {
                     )
                 }
 
+                // Shihab: duplicates off: a code already in this session is dropped with a short notice
+                if (!_allowDuplicates && HistoryViewModel.isInSession(value!!)) {
+                    Log.d(TAG, "Duplicate ignored: $value")
+                    viewModelScope.launch {
+                        Toast.makeText(appContext, R.string.shihab_duplicate_ignored, Toast.LENGTH_SHORT).show()
+                    }
+                    return@detected
+                }
+
                 val formatIdx = ZXingAnalyzer.format2Index(format)
                 HistoryViewModel.addHistoryItem(value!!, formatIdx)
 
@@ -235,7 +249,10 @@ class CameraViewModel : ViewModel() {
             )
         ).build()
 
+        cameraPreviewUseCase.targetRotation = rotation
+
         val analyzerBuilder = ImageAnalysis.Builder()
+            .setTargetRotation(rotation)
             .setResolutionSelector(resolutionSelector)
             .setOutputImageRotationEnabled(false)
             .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
@@ -277,6 +294,7 @@ class CameraViewModel : ViewModel() {
 
         imageCapture = ImageCapture.Builder()
             .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+            .setTargetRotation(rotation)
             .build()
 
         val camera = processCameraProvider.bindToLifecycle(
@@ -377,8 +395,12 @@ class CameraViewModel : ViewModel() {
     private var scale = 1.0f
     private var translation = Offset(0.0f, 0.0f)
 
+    private var lastViewSize: IntSize? = null
+
     fun transformPoint(point: Point, scanSize: Size, reverse: Boolean = false): PointF {
-        if (scanSize != lastScanSize) {
+        // Shihab: also recomputed when the view changes size (turning the phone)
+        if (scanSize != lastScanSize || viewSize != lastViewSize) {
+            lastViewSize = viewSize
             val vw = viewSize?.width ?: return point.toPointF()
             val vh = viewSize?.height ?: return point.toPointF()
 
@@ -450,6 +472,10 @@ class CameraViewModel : ViewModel() {
     private var _clearAfterTime: Long? = null
     private var _saveScanImageFormat: ScanImageFormat = ScanImageFormat.JPEG
     private var _directApplyTemplate: String? = null
+    @Volatile
+    private var _rapidScan: Boolean = false
+    @Volatile
+    private var _allowDuplicates: Boolean = true
 
     fun updateScanParameters(
         fullyInside: Boolean,
@@ -466,8 +492,13 @@ class CameraViewModel : ViewModel() {
         multiCodeDetection: Boolean,
         autoSend: Boolean,
         directApplyTemplate: String?,
+        rapidScan: Boolean,
+        allowDuplicates: Boolean,
     ) {
-        _scanDelay = frequency.delayMs
+        _rapidScan = rapidScan
+        _allowDuplicates = allowDuplicates
+        // Rapid mode reads every frame, whatever the scan frequency setting says
+        _scanDelay = if (rapidScan) 0 else frequency.delayMs
         barcodeAnalyzer?.scanDelay = _scanDelay
         _fullyInside = fullyInside
         if (!fullyInside) {
@@ -551,11 +582,34 @@ class CameraViewModel : ViewModel() {
     var multiCodeDetection: Boolean = false
     private var _autoSend: Boolean = false
 
+    // Rapid mode: when each code was last seen (analyzer thread only)
+    private val rapidLastSeen = mutableMapOf<String, Long>()
+
     data class Barcode(
         var value: String?,
         val cornerPoints: List<PointF>,
         val format: BarcodeReader.Format
     )
+
+    // Rapid mode: every new code in the frame is taken at once. A code already taken is ignored until
+    // it has been out of sight for RAPID_REPEAT_GAP_MS, so one blurred frame does not take it twice,
+    // while scanning the same code again after moving away still counts.
+    private fun dispatchRapid(barcodes: List<Barcode>, sourceImage: ImageProxy) {
+        val now = System.currentTimeMillis()
+        rapidLastSeen.entries.removeAll { now - it.value > RAPID_REPEAT_GAP_MS }
+
+        if (barcodes.isEmpty()) {
+            _currentBarcode.update { null }
+            return
+        }
+
+        barcodes.forEach { barcode ->
+            val value = barcode.value ?: return@forEach
+            if (rapidLastSeen.put(value, now) == null) {
+                processAndDispatch(barcode, sourceImage, resetDedup = true)
+            }
+        }
+    }
 
     fun onBarcodeResult(
         result: List<BarcodeReader.Result>,
@@ -622,7 +676,9 @@ class CameraViewModel : ViewModel() {
         // Always expose all detected barcodes for visual overlay and picker
         _detectedBarcodes.update { allBarcodes }
 
-        if (_autoSend) {
+        if (_rapidScan) {
+            dispatchRapid(allBarcodes, sourceImage)
+        } else if (_autoSend) {
             // Auto-send: queue all new barcodes in this frame (dedup within session)
             if (allBarcodes.isEmpty()) {
                 sentInSession.clear()

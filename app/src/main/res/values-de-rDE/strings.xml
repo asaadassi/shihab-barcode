@@ -105,6 +105,7 @@
         <item>Schnell (100ms)</item>
         <item>Normal (500ms)</item>
         <item>Langsam (1s)</item>
+        <item>5 Sekunden zwischen Scans</item>
     </string-array>
     <string-array name="scan_res_values">
         <item>SD (480P)</item>

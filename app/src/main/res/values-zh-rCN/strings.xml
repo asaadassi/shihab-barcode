@@ -287,6 +287,7 @@
         <item>快速 (100毫秒)</item>
         <item>普通 (500毫秒)</item>
         <item>慢速 (1秒)</item>
+        <item>每次读取间隔 5 秒</item>
     </string-array>
     <string-array name="scan_res_values">
         <item>标清 (480P)</item>

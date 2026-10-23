@@ -31,7 +31,9 @@ import dev.fabik.bluetoothhid.ui.theme.BluetoothHIDTheme
 import dev.fabik.bluetoothhid.ui.theme.configureWindow
 import dev.fabik.bluetoothhid.ui.tooltip
 import dev.fabik.bluetoothhid.utils.LocalDataStore
+import dev.fabik.bluetoothhid.utils.PreferenceStore
 import dev.fabik.bluetoothhid.utils.ProfileManager
+import dev.fabik.bluetoothhid.utils.rememberPreference
 import app.shihab.shared.locale.ShihabLang
 import kotlinx.coroutines.runBlocking
 
@@ -80,7 +82,9 @@ class SettingsActivity : ComponentActivity() {
                                         }
                                     },
                                     actions = {
-                                        SettingsDropdown()
+                                        // Shihab: import/export and developer options belong to the advanced mode.
+                                        val advanced by rememberPreference(PreferenceStore.SHOW_ADVANCED)
+                                        if (advanced) SettingsDropdown()
                                     },
                                     scrollBehavior = scrollBehavior
                                 )

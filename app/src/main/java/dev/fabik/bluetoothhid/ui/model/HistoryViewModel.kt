@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.TableRows
 import androidx.compose.material.icons.filled.TableView
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -33,10 +34,12 @@ class HistoryViewModel : ViewModel() {
     var filteredTypes = mutableStateListOf<Int>()
     var filterDateStart by mutableStateOf<Long?>(null)
     var filterDateEnd by mutableStateOf<Long?>(null)
+    var sessionOnly by mutableStateOf(false)
 
     val filteredHistory by derivedStateOf {
         historyEntries.fastFilter { (barcode, timestamp, type) ->
-            barcode.contains(searchQuery, ignoreCase = true)
+            (!sessionOnly || timestamp >= sessionStart)
+                    && barcode.contains(searchQuery, ignoreCase = true)
                     && (filteredTypes.isEmpty() || filteredTypes.contains(type))
                     && (filterDateStart == null || timestamp > filterDateStart!!)
                     && (filterDateEnd == null || timestamp < filterDateEnd!!)
@@ -50,6 +53,20 @@ class HistoryViewModel : ViewModel() {
         private var historyFileLoaded = false
 
         var historyEntries: SnapshotStateList<HistoryEntry> = mutableStateListOf<HistoryEntry>()
+
+        // A session runs from app start (or "New session") on; earlier history is kept, just not part of it
+        var sessionStart by mutableLongStateOf(System.currentTimeMillis())
+            private set
+
+        fun startNewSession() {
+            sessionStart = System.currentTimeMillis()
+        }
+
+        /** Whether [value] was already read in this session. */
+        fun isInSession(value: String): Boolean {
+            val start = sessionStart
+            return historyEntries.toList().any { it.timestamp >= start && it.value == value }
+        }
 
         fun saveHistory(context: Context) {
             runCatching {
@@ -191,11 +208,7 @@ class HistoryViewModel : ViewModel() {
         }
     }
 
-    fun exportHistory(
-        exportType: ExportType,
-        deduplicate: Boolean,
-        formatNames: Array<String>
-    ): String {
+    fun entriesToExport(deduplicate: Boolean): List<HistoryEntry> {
         var history = filteredHistory
         if (isSelecting) {
             history = history.fastFilter {
@@ -205,8 +218,14 @@ class HistoryViewModel : ViewModel() {
         if (deduplicate) {
             history = history.fastDistinctBy { it.value }
         }
-        return exportEntries(history, exportType, formatNames)
+        return history
     }
+
+    fun exportHistory(
+        exportType: ExportType,
+        deduplicate: Boolean,
+        formatNames: Array<String>
+    ): String = exportEntries(entriesToExport(deduplicate), exportType, formatNames)
 
     data class HistoryEntry(val value: String, val timestamp: Long, val format: Int)
 

@@ -162,6 +162,7 @@
         <item>سريع (100ms)</item>
         <item>عادي (500ms)</item>
         <item>بطيء (1s)</item>
+        <item>5 ثوانٍ بين كل قراءة</item>
     </string-array>
     <string-array name="scan_res_values">
         <item>SD (480P)</item>
@@ -192,9 +193,11 @@
         <item>الهنغارية (HU)</item>
     </string-array>
     <string-array name="connection_mode_values">
-        <item>لوحة مفاتيح HID</item>
-        <item>RFCOMM (SPP)</item>
+        <item>لوحة مفاتيح بلوتوث (دون برنامج على الحاسوب)</item>
+        <item>بلوتوث إلى الحاسوب (RFCOMM)</item>
         <item>الإرسال إلى الإضافات الخارجية فقط</item>
+        <item>الحاسوب: واي فاي أو كبل USB</item>
+        <item>قراءة فقط دون إرسال</item>
     </string-array>
     <string name="external_output">إضافات الإرسال الخارجي</string>
     <string name="external_no_plugins">لا توجد إضافات مثبّتة</string>

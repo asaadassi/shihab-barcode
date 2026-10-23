@@ -1,5 +1,11 @@
 package dev.fabik.bluetoothhid.ui
 
+import android.view.Surface
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.platform.LocalView
+
 import android.app.Activity
 import android.content.Intent
 import android.os.Build
@@ -89,6 +95,7 @@ fun CameraPreviewContent(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val configuration = LocalConfiguration.current
+    val view = LocalView.current
 
     val scope = rememberCoroutineScope()
     val errorDialog = rememberDialogState()
@@ -128,6 +135,8 @@ fun CameraPreviewContent(
                         PreferenceStore.PREVIEW_PERFORMANCE_MODE.extract(it),
                         PreferenceStore.PREVIEW_STABILIZATION.extract(it),
                         PreferenceStore.INITIAL_ZOOM.extract(it),
+                        // Shihab: the screen's rotation now, so the preview follows a turn of the phone
+                        rotation = view.display?.rotation ?: Surface.ROTATION_0,
                         onCameraReady = onCameraReady,
                         onBarcode = onBarcodeDetected,
                     )
@@ -147,7 +156,10 @@ fun CameraPreviewContent(
     val doubleTap = zoomGestures?.contains("2") == true
 
     val surfaceRequest by viewModel.surfaceRequest.collectAsStateWithLifecycle()
-    surfaceRequest?.let { request ->
+    // Shihab: the camera picture, its frame and the focus ring are laid out left to right whatever the app
+    // language. In right to left the viewfinder's own offset was mirrored, so in landscape the picture sat
+    // unscaled at one side with a black band beside it (and the focus ring appeared opposite the tap).
+    surfaceRequest?.let { request -> CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         var isFocusing by remember { mutableStateOf(false) }
         var autofocusCoords by remember { mutableStateOf(Offset.Unspecified) }
 
@@ -236,7 +248,7 @@ fun CameraPreviewContent(
                     .size(48.dp)
             )
         }
-    }
+    } }
 
     OcrDetectionFAB(viewModel)
 
@@ -271,7 +283,9 @@ fun CameraPreviewPreferences(viewModel: CameraViewModel) {
         PreferenceStore.MULTI_CODE_DETECTION,
         PreferenceStore.AUTO_SEND,
         PreferenceStore.TEMPLATE_TEXT,
-        PreferenceStore.DIRECT_APPLY_TEMPLATE
+        PreferenceStore.DIRECT_APPLY_TEMPLATE,
+        PreferenceStore.RAPID_SCAN,
+        PreferenceStore.ALLOW_DUPLICATES
     )
 
     scanner?.let {
@@ -300,7 +314,9 @@ fun CameraPreviewPreferences(viewModel: CameraViewModel) {
                 PreferenceStore.SAVE_SCAN_IMAGE_FORMAT.extractEnum(it),
                 PreferenceStore.MULTI_CODE_DETECTION.extract(it),
                 PreferenceStore.AUTO_SEND.extract(it),
-                if (directApplyTemplate) PreferenceStore.TEMPLATE_TEXT.extract(it) else null
+                if (directApplyTemplate) PreferenceStore.TEMPLATE_TEXT.extract(it) else null,
+                PreferenceStore.RAPID_SCAN.extract(it),
+                PreferenceStore.ALLOW_DUPLICATES.extract(it)
             )
         }
     }

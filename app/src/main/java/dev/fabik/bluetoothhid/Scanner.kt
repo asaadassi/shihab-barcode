@@ -1,5 +1,6 @@
 package dev.fabik.bluetoothhid
 
+import dev.fabik.bluetoothhid.shihab.PcLinkIndicator
 import app.shihab.shared.locale.ShihabDigits
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
@@ -40,6 +41,11 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import android.content.res.Configuration
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material.icons.outlined.Repeat
+import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.lazy.LazyColumn
@@ -55,6 +61,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material.icons.outlined.FastForward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.FlashOff
@@ -70,6 +80,7 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FabPosition
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -89,6 +100,8 @@ import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
@@ -120,6 +133,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -140,6 +154,7 @@ import dev.fabik.bluetoothhid.ui.Routes
 import dev.fabik.bluetoothhid.ui.model.BarcodeResult
 import dev.fabik.bluetoothhid.ui.model.CameraViewModel
 import dev.fabik.bluetoothhid.ui.model.CameraViewModel.Barcode
+import dev.fabik.bluetoothhid.ui.model.HistoryViewModel
 import dev.fabik.bluetoothhid.ui.rememberDialogState
 import dev.fabik.bluetoothhid.ui.tooltip
 import dev.fabik.bluetoothhid.utils.ConnectionMode
@@ -156,6 +171,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 // Grace period after entering the scanner before a silent external plugin is shown as "not responding".
 private const val EXTERNAL_INIT_GRACE_MS = 6_000L
@@ -322,7 +341,7 @@ fun Scanner(
         floatingActionButtonPosition = FabPosition.Center,
         floatingActionButton = {
             val connectionMode by context.getPreferenceState(PreferenceStore.CONNECTION_MODE)
-            val isExternal = connectionMode == ConnectionMode.EXTERNAL.ordinal
+            val isExternal = connectionMode == ConnectionMode.EXTERNAL.ordinal || connectionMode == ConnectionMode.PC.ordinal  // Shihab: PC has no Bluetooth device either
             // External has no Bluetooth device but still needs a manual send button
             if (currentDevice != null || isExternal) {
                 val clearAfterSend by context.getPreferenceState(PreferenceStore.CLEAR_AFTER_SEND)
@@ -460,7 +479,21 @@ fun Scanner(
             // Multi-code picker: visible when multi-code detection is on but auto-send is off
             val multiCodeDetection by context.getPreferenceState(PreferenceStore.MULTI_CODE_DETECTION)
             val autoSend by context.getPreferenceState(PreferenceStore.AUTO_SEND)
-            if (multiCodeDetection == true && autoSend != true) {
+            val rapidScan by context.getPreferenceState(PreferenceStore.RAPID_SCAN)
+            // Shihab: the session bar is always there (count, duplicates, new session, export); the list of
+            // readings only while scanning rapidly. In landscape it stands at the side, clear of the frame.
+            val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+            RapidSessionPanel(
+                showList = rapidScan == true,
+                modifier = if (landscape) Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(12.dp)
+                    .width(240.dp)
+                else Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(start = 12.dp, end = 12.dp, bottom = 88.dp)
+            )
+            if (rapidScan != true && multiCodeDetection == true && autoSend != true) {
                 val detectedBarcodes by cameraVM.detectedBarcodes.collectAsStateWithLifecycle()
                 if (detectedBarcodes.isNotEmpty()) {
                     MultiCodePicker(
@@ -475,6 +508,131 @@ fun Scanner(
         }
     }
 }
+
+/**
+ * Readings of the current session while scanning rapidly, newest first. Tapping a reading copies it;
+ * the bar exports the session (to a file, a share, or typed on the computer) or starts a new one.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RapidSessionPanel(showList: Boolean, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val privateMode by context.getPreferenceStateDefault(PreferenceStore.PRIVATE_MODE)
+    val copyValue = rememberCopyValue()
+
+    // Export works on this session only, through the same sheet as the history screen
+    val historyVM = viewModel<HistoryViewModel>()
+    SideEffect { historyVM.sessionOnly = true }
+
+    val sessionEntries by remember {
+        derivedStateOf {
+            val start = HistoryViewModel.sessionStart
+            HistoryViewModel.historyEntries.filter { it.timestamp >= start }.asReversed()
+        }
+    }
+
+    Surface(
+        modifier = modifier.widthIn(max = 560.dp).fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.94f),
+        tonalElevation = 2.dp
+    ) {
+        Column(Modifier.padding(vertical = 4.dp)) {
+            Row(
+                Modifier.padding(start = 16.dp, end = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    stringResource(R.string.shihab_session_count, sessionEntries.size),
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.weight(1f)
+                )
+
+                val allowDuplicates by context.getPreferenceStateDefault(PreferenceStore.ALLOW_DUPLICATES)
+                val duplicatesLabel = stringResource(
+                    if (allowDuplicates) R.string.shihab_duplicates_allowed else R.string.shihab_duplicates_blocked
+                )
+                IconToggleButton(
+                    checked = !allowDuplicates,
+                    onCheckedChange = { block ->
+                        scope.launch { context.setPreference(PreferenceStore.ALLOW_DUPLICATES, !block) }
+                    },
+                    modifier = Modifier.tooltip(duplicatesLabel)
+                ) {
+                    Icon(
+                        if (allowDuplicates) Icons.Outlined.Repeat else Icons.Filled.RepeatOne,
+                        duplicatesLabel,
+                        tint = if (allowDuplicates) MaterialTheme.colorScheme.onSurface
+                        else MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                val newSession = stringResource(R.string.shihab_session_new)
+                IconButton(
+                    onClick = { HistoryViewModel.startNewSession() },
+                    enabled = sessionEntries.isNotEmpty(),
+                    modifier = Modifier.tooltip(newSession)
+                ) {
+                    Icon(Icons.Default.RestartAlt, newSession)
+                }
+
+                val exportSession = stringResource(R.string.shihab_session_export)
+                historyVM.ExportSheet { open ->
+                    IconButton(
+                        onClick = open,
+                        enabled = sessionEntries.isNotEmpty(),
+                        modifier = Modifier.tooltip(exportSession)
+                    ) {
+                        Icon(Icons.Default.FileDownload, exportSession)
+                    }
+                }
+            }
+
+            if (!showList) {
+                // Count and buttons only
+            } else if (sessionEntries.isEmpty()) {
+                Text(
+                    stringResource(R.string.shihab_session_empty),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            } else {
+                val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+                LazyColumn(Modifier.heightIn(max = if (landscape) 120.dp else 168.dp)) {
+                    items(sessionEntries, key = { it.hashCode() }) { entry ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { copyValue(entry.value) }
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text(
+                                if (privateMode) "*".repeat(entry.value.length) else entry.value,
+                                style = MaterialTheme.typography.bodyLarge.copy(textDirection = TextDirection.Ltr),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                SESSION_TIME.format(
+                                    Instant.ofEpochMilli(entry.timestamp).atZone(ZoneId.systemDefault())
+                                ),
+                                style = MaterialTheme.typography.labelSmall.copy(textDirection = TextDirection.Ltr),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private val SESSION_TIME = DateTimeFormatter.ofPattern("HH:mm:ss", Locale.ROOT)
 
 @Composable
 private fun MultiCodePicker(
@@ -819,7 +977,7 @@ private fun ScannerAppBar(
     val navigation = LocalNavigation.current
     val context = LocalContext.current
     val connectionMode by context.getPreferenceState(PreferenceStore.CONNECTION_MODE)
-    val isExternal = connectionMode == ConnectionMode.EXTERNAL.ordinal
+    val isExternal = connectionMode == ConnectionMode.EXTERNAL.ordinal || connectionMode == ConnectionMode.PC.ordinal  // Shihab: PC has no Bluetooth device either
 
     // Shadow for text in fullscreen mode
     val textShadow = Shadow(
@@ -874,6 +1032,27 @@ private fun ScannerAppBar(
                     )
                 }
                 KeyboardInputDialog(keyboardDialog)
+            }
+
+            val rapidScan by context.getPreferenceStateDefault(PreferenceStore.RAPID_SCAN)
+            val rapidLabel = stringResource(R.string.shihab_rapid_scan)
+            val scope = rememberCoroutineScope()
+            IconToggleButton(
+                checked = rapidScan,
+                onCheckedChange = { scope.launch { context.setPreference(PreferenceStore.RAPID_SCAN, it) } },
+                modifier = Modifier.tooltip(rapidLabel)
+            ) {
+                Icon(
+                    // Fast-forward, not a lightning bolt: the flash button beside it is a bolt.
+                    if (rapidScan) Icons.Filled.FastForward else Icons.Outlined.FastForward,
+                    rapidLabel,
+                    tint = when {
+                        rapidScan -> MaterialTheme.colorScheme.primary
+                        transparent -> Color.White
+                        else -> MaterialTheme.colorScheme.onSurface
+                    },
+                    modifier = if (transparent) Modifier.iconBackgroundModifier() else Modifier
+                )
             }
 
             IconButton(onClick = {
@@ -992,13 +1171,25 @@ fun DeviceStatusIndicator() {
         val currentDevice by controller.currentDevice.collectAsStateWithLifecycle()
         val connectionMode by context.getPreferenceState(PreferenceStore.CONNECTION_MODE)
         val isRFCOMMListening by controller.isRFCOMMListeningFlow.collectAsStateWithLifecycle()
-        val isExternal = connectionMode == ConnectionMode.EXTERNAL.ordinal
+        val isExternal = connectionMode == ConnectionMode.EXTERNAL.ordinal || connectionMode == ConnectionMode.PC.ordinal  // Shihab: PC has no Bluetooth device either
 
         var dismissed by rememberSaveable { mutableStateOf(false) }
 
         when {
             // External mode has no Bluetooth device — plugin readiness is shown by
             // ExternalPluginIndicator instead, so suppress the "No device" card here.
+            // Shihab: PC mode shows the link to Barcode Receiver.
+            connectionMode == ConnectionMode.PC.ordinal -> PcLinkIndicator(controller.pcLink)
+
+            // Shihab: read only keeps the scans in the history, there is no device to connect.
+            connectionMode == ConnectionMode.LOCAL.ordinal -> ElevatedWarningCard(
+                message = stringResource(R.string.shihab_local_mode),
+                subMessage = stringResource(R.string.shihab_local_mode_desc),
+                onClick = {},
+                onDismiss = { dismissed = true },
+                visible = !dismissed
+            )
+
             isExternal -> Unit
 
             currentDevice == null -> {
