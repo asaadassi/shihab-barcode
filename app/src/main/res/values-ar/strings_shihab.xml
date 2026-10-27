@@ -56,4 +56,16 @@
     <string name="shihab_duplicates_allowed">الرموز المكررة مسموحة</string>
     <string name="shihab_duplicates_blocked">الرموز المكررة ممنوعة في هذه الجلسة</string>
     <string name="shihab_duplicate_ignored">رمز مكرر، قُرئ في هذه الجلسة</string>
+    <string name="shihab_pair_title">تعريف الجوال على الحاسوب</string>
+    <string name="shihab_pair_scan_hint">افتح باركود على الحاسوب ووجّه الكاميرا إلى رمز الاقتران</string>
+    <string name="shihab_pair_not_code">هذا ليس رمز اقتران باركود</string>
+    <string name="shihab_pair_permission">الوصول إلى الشبكة المحلية</string>
+    <string name="shihab_pair_permission_desc">بدونه لا يصل الجوال إلى الحاسوب عبر الواي فاي</string>
+    <string name="shihab_pair_allow">السماح</string>
+    <string name="shihab_pair_open_settings">فتح الإعدادات</string>
+    <string name="shihab_pair_start">بدء المسح</string>
+    <string name="shihab_pair_continue">المتابعة، وتُرسل القراءات عند الاتصال</string>
+    <string name="shihab_pair_retry">إعادة المحاولة</string>
+    <string name="shihab_pair_rescan">مسح رمز اقتران جديد</string>
+    <string name="shihab_pair_manage">إدارة الاتصال بالحاسوب</string>
 </resources>

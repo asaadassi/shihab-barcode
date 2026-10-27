@@ -22,6 +22,7 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<ScanRow> _rows = new();
     private readonly List<ExportRow> _session = new();
     private string _qrFor = "";
+    private bool _firewallOk = true;
 
     private static App A => App.Current;
 
@@ -43,6 +44,8 @@ public partial class MainWindow : Window
         {
             Signature.Show(App.Info);
             CrashHandler.OfferReportAfterCrash(this, App.Info);
+            Refresh();
+            _firewallOk = await FirewallRule.ExistsAsync();
             Refresh();
             await LoadPairedPhonesAsync();
             _ = NewsBar.StartAsync(App.Info);
@@ -79,9 +82,13 @@ public partial class MainWindow : Window
         if (!A.Listening) State(WifiState, "متوقف", "Danger");
         else if (wifi.Count > 0) State(WifiState, "متصل", "Ok");
         else if (ips.Count == 0) State(WifiState, "لا شبكة", "Muted");
+        else if (!_firewallOk) State(WifiState, "محجوب", "Warn");
         else State(WifiState, "بانتظار جوال", "Muted");
         WifiDetail.Text = wifi.Count > 0 ? Names(wifi.Select(p => p.Name))
-            : ips.Count == 0 ? "الحاسوب غير متصل بشبكة" : "جوال وحاسوب على الشبكة نفسها";
+            : ips.Count == 0 ? "الحاسوب غير متصل بشبكة"
+            : !_firewallOk ? ReceiverErrors.FirewallBlocked.Message
+            : "جوال وحاسوب على الشبكة نفسها";
+        FirewallButton.Visibility = A.Listening && !_firewallOk && wifi.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
 
         if (cable.Count > 0) { State(CableState, "متصل", "Ok"); CableDetail.Text = Names(cable.Select(p => p.Name)); }
         else
@@ -193,6 +200,15 @@ public partial class MainWindow : Window
             ReceiverSettings.Current.BluetoothPhoneName = phone.Name;
         }
         ReceiverSettings.Save();
+        Refresh();
+    }
+
+    private async void OnAllowFirewall(object sender, RoutedEventArgs e)
+    {
+        FirewallButton.IsEnabled = false;
+        _firewallOk = await FirewallRule.AddAsync();
+        FirewallButton.IsEnabled = true;
+        if (!_firewallOk) Notice(ReceiverErrors.FirewallBlocked.Text);
         Refresh();
     }
 

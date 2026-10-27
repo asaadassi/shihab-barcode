@@ -16,15 +16,18 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import dev.fabik.bluetoothhid.Devices
 import dev.fabik.bluetoothhid.History
 import dev.fabik.bluetoothhid.LocalController
 import dev.fabik.bluetoothhid.R
 import dev.fabik.bluetoothhid.Scanner
 import dev.fabik.bluetoothhid.shihab.ConnectionStart
+import dev.fabik.bluetoothhid.shihab.PcPairing
 import dev.fabik.bluetoothhid.ui.model.BarcodeResult
 import dev.fabik.bluetoothhid.utils.ConnectionMode
 import dev.fabik.bluetoothhid.utils.PreferenceStore
@@ -38,6 +41,7 @@ import kotlinx.coroutines.launch
 
 object Routes {
     const val Start = "Start"  // Shihab: the connection choice, always the first screen
+    const val Pair = "Pair"    // Shihab: pairs the phone with the PC (Wi-Fi/cable) before scanning; "Pair?manage=true" from the scanner
     const val Devices = "Devices"
     const val Main = "Main"
     const val History = "History"
@@ -80,14 +84,18 @@ fun NavGraph() {
     CompositionLocalProvider(LocalNavigation provides navController) {
         NavHost(navController, Routes.Start) {
             // Shihab: Bluetooth goes on to the device list (or straight to the scanner when already
-            // connected); Wi-Fi/cable and direct reading have no Bluetooth device and open the scanner.
+            // connected); Wi-Fi/cable first pairs with the PC and checks the link; direct reading opens the scanner.
             composable(Routes.Start) {
                 ConnectionStart { mode ->
                     scope.launch {
                         context.setPreference(PreferenceStore.CONNECTION_MODE, mode.ordinal)
                         val bluetooth = mode == ConnectionMode.HID || mode == ConnectionMode.RFCOMM
                         navController.navigate(
-                            if (bluetooth && currentDevice == null) Routes.Devices else Routes.Main
+                            when {
+                                bluetooth && currentDevice == null -> Routes.Devices
+                                mode == ConnectionMode.PC && controller != null -> Routes.Pair
+                                else -> Routes.Main
+                            }
                         ) { launchSingleTop = true }
                     }
                 }
@@ -102,6 +110,23 @@ fun NavGraph() {
                         scope.launch {
                             delay(2000)
                             canExit = false
+                        }
+                    }
+                }
+            }
+
+            composable(
+                "${Routes.Pair}?manage={manage}",
+                arguments = listOf(navArgument("manage") { type = NavType.BoolType; defaultValue = false })
+            ) { entry ->
+                val manage = entry.arguments?.getBoolean("manage") == true
+                val link = controller?.pcLink
+                if (link != null) {
+                    PcPairing(link, manage, onBack = { navController.navigateUp() }) {
+                        if (manage) navController.navigateUp()
+                        else navController.navigate(Routes.Main) {
+                            popUpTo(Routes.Start)
+                            launchSingleTop = true
                         }
                     }
                 }

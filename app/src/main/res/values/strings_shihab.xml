@@ -56,4 +56,16 @@
     <string name="shihab_duplicates_allowed">Duplicate codes allowed</string>
     <string name="shihab_duplicates_blocked">Duplicate codes blocked in this session</string>
     <string name="shihab_duplicate_ignored">Duplicate code, already read in this session</string>
+    <string name="shihab_pair_title">Pair with the PC</string>
+    <string name="shihab_pair_scan_hint">Open Barcode on the PC and point the camera at its pairing code</string>
+    <string name="shihab_pair_not_code">This is not a Barcode pairing code</string>
+    <string name="shihab_pair_permission">Local network access</string>
+    <string name="shihab_pair_permission_desc">Without it the phone can\'t reach the PC over Wi-Fi</string>
+    <string name="shihab_pair_allow">Allow</string>
+    <string name="shihab_pair_open_settings">Open settings</string>
+    <string name="shihab_pair_start">Start scanning</string>
+    <string name="shihab_pair_continue">Continue; scans are sent once connected</string>
+    <string name="shihab_pair_retry">Try again</string>
+    <string name="shihab_pair_rescan">Scan a new pairing code</string>
+    <string name="shihab_pair_manage">Manage the PC connection</string>
 </resources>

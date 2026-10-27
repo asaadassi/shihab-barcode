@@ -82,6 +82,11 @@
                                 <DockPanel>
                                     <TextBlock Text="&#xE701;" Style="{StaticResource Glyph}" Margin="0,0,10,0" />
                                     <TextBlock x:Name="WifiState" DockPanel.Dock="Right" FontWeight="Bold" FontSize="12.5" VerticalAlignment="Center" />
+                                    <!-- Shown while no firewall rule lets the phones in (RCV-010) -->
+                                    <Button x:Name="FirewallButton" DockPanel.Dock="Right" Style="{StaticResource GhostButton}" Height="34"
+                                            Margin="0,0,8,0" Content="السماح" Visibility="Collapsed"
+                                            ToolTip="السماح للجوالات بالوصول عبر جدار حماية ويندوز"
+                                            AutomationProperties.Name="السماح للجوالات عبر جدار الحماية" Click="OnAllowFirewall" />
                                     <StackPanel>
                                         <TextBlock Text="الواي فاي" FontWeight="Bold" FontSize="13.5" />
                                         <TextBlock x:Name="WifiDetail" Style="{StaticResource MutedText}" />

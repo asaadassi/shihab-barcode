@@ -1,6 +1,7 @@
 package dev.fabik.bluetoothhid.shihab
 
 import android.content.Context
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -18,13 +19,17 @@ import kotlinx.coroutines.launch
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.OutputStream
+import java.net.ConnectException
 import java.net.InetSocketAddress
+import java.net.NoRouteToHostException
 import java.net.Socket
+import java.net.SocketTimeoutException
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.security.cert.CertificateException
 import java.security.cert.X509Certificate
 import javax.net.ssl.SSLContext
+import javax.net.ssl.SSLHandshakeException
 import javax.net.ssl.SSLSocket
 import javax.net.ssl.X509TrustManager
 
@@ -39,9 +44,30 @@ class PcLink(private val context: Context, private val scope: CoroutineScope) {
 
     sealed class State {
         object NotPaired : State()
-        data class Connecting(val pcName: String) : State()
+        /** [problem]: why the last round of attempts failed, null while the first round runs. */
+        data class Connecting(val pcName: String, val problem: Problem? = null) : State()
         data class Connected(val pcName: String, val cable: Boolean) : State()
     }
+
+    /** Why the PC was not reached, most telling first (the pairing screen explains each one). */
+    enum class Problem {
+        /** Android 17: the local network permission is not granted, every Wi-Fi connection is blocked. */
+        PERMISSION,
+        /** The PC answered with the pairing key refused: it made a new pairing code. */
+        OLD_CODE,
+        /** Another certificate: the receiver was reinstalled or this code is from another PC. */
+        OTHER_PC,
+        /** The PC is reachable but nothing listens: Barcode Receiver is closed. */
+        CLOSED,
+        /** No answer: the Windows firewall, another network, or a Wi-Fi that isolates its devices. */
+        NO_ANSWER,
+        /** The phone has no route to the PC's address (Wi-Fi off, mobile data only). */
+        NO_NETWORK,
+        /** The pairing code had no address (the PC had no network when it was shown). */
+        NO_ADDRESS,
+    }
+
+    private class Refused(val problem: Problem) : Exception()
 
     private class Pending(val id: Long, val text: String) {
         @Volatile var sentAt = 0L
@@ -69,6 +95,13 @@ class PcLink(private val context: Context, private val scope: CoroutineScope) {
     fun start() {
         if (job?.isActive == true) return
         job = scope.launch(Dispatchers.IO) { run() }
+    }
+
+    /** Tries again now instead of after the back-off (a permission granted, the firewall opened). */
+    fun retry() {
+        if (job == null) return
+        stop()
+        start()
     }
 
     fun stop() {
@@ -99,25 +132,53 @@ class PcLink(private val context: Context, private val scope: CoroutineScope) {
                 continue
             }
             if (_state.value !is State.Connecting) _state.value = State.Connecting(p.pcName)
-            val connected = connectAny(p)
-            if (connected) wait = 1000L
+            val problem = connectAny(p)
+            if (problem == null) wait = 1000L
+            else _state.value = State.Connecting(p.pcName, problem)
             delay(wait)
             wait = (wait * 2).coerceAtMost(15_000L)
         }
     }
 
-    /** Cable first (127.0.0.1), then each Wi-Fi address; serves the first that answers until it drops. */
-    private fun connectAny(p: Pairing): Boolean {
+    /**
+     * Cable first (127.0.0.1), then each Wi-Fi address; serves the first that answers until it drops. Returns null
+     * after a link, or the most telling reason none of the Wi-Fi addresses answered (the cable is often absent).
+     */
+    private fun connectAny(p: Pairing): Problem? {
         val targets = listOf(LOOPBACK) + p.hosts
+        var worst: Problem? = null
         for (host in targets) {
-            val (s, reader) = try { open(host, p) } catch (e: Exception) { null } ?: continue
-            serve(s, reader, p, cable = host == LOOPBACK)
-            return true
+            val opened = try {
+                open(host, p)
+            } catch (e: Exception) {
+                if (host != LOOPBACK) {
+                    val problem = problemOf(e)
+                    ShihabLog.info("pc_connect_failed", mapOf("problem" to problem.name, "error" to e.javaClass.simpleName))
+                    if (worst == null || problem.ordinal < worst.ordinal) worst = problem
+                }
+                null
+            } ?: continue
+            serve(opened.first, opened.second, p, cable = host == LOOPBACK)
+            return null
         }
-        return false
+        if (p.hosts.isEmpty()) return Problem.NO_ADDRESS
+        if (!hasLocalNetwork(context)) return Problem.PERMISSION
+        return worst ?: Problem.NO_ANSWER
     }
 
-    private fun open(host: String, p: Pairing): Pair<SSLSocket, BufferedReader>? {
+    private fun problemOf(e: Exception): Problem = when (e) {
+        is Refused -> e.problem
+        is SSLHandshakeException -> Problem.OTHER_PC
+        is SocketTimeoutException -> Problem.NO_ANSWER
+        is ConnectException ->
+            if (e.message.orEmpty().contains("ECONNREFUSED")) Problem.CLOSED
+            else if (e.message.orEmpty().contains("ENETUNREACH")) Problem.NO_NETWORK
+            else Problem.NO_ANSWER
+        is NoRouteToHostException -> Problem.NO_NETWORK
+        else -> Problem.NO_ANSWER
+    }
+
+    private fun open(host: String, p: Pairing): Pair<SSLSocket, BufferedReader> {
         val raw = Socket()
         raw.connect(InetSocketAddress(host, p.port), if (host == LOOPBACK) 800 else 2500)
         raw.soTimeout = READ_TIMEOUT_MS
@@ -129,11 +190,11 @@ class PcLink(private val context: Context, private val scope: CoroutineScope) {
         val o = s.outputStream
         write(o, "HELLO 1 ${p.key} ${phoneId()} ${b64(phoneName())}")
         val reader = BufferedReader(InputStreamReader(s.inputStream, Charsets.UTF_8))
-        val answer = reader.readLine() ?: run { s.close(); return null }
+        val answer = reader.readLine() ?: run { s.close(); throw Refused(Problem.NO_ANSWER) }
         if (!answer.startsWith("OK ")) {
             ShihabLog.error(BarcodeErrors.PC_REFUSED.code, "pc refused: ${answer.take(12)}")
             s.close()
-            return null
+            throw Refused(Problem.OLD_CODE)
         }
         return s to reader
     }
@@ -229,6 +290,17 @@ class PcLink(private val context: Context, private val scope: CoroutineScope) {
 
     companion object {
         const val PREFIX = "shihabbarcode://pair?"
+
+        /**
+         * Android 17 (API 37) blocks connections to the local network for apps targeting it unless this runtime
+         * permission is granted: without it every Wi-Fi attempt times out, only the cable (127.0.0.1) works.
+         */
+        const val LOCAL_NETWORK_PERMISSION = "android.permission.ACCESS_LOCAL_NETWORK"
+
+        fun needsLocalNetworkPermission(): Boolean = Build.VERSION.SDK_INT >= 37
+
+        fun hasLocalNetwork(context: Context): Boolean = !needsLocalNetworkPermission() ||
+            context.checkSelfPermission(LOCAL_NETWORK_PERMISSION) == PackageManager.PERMISSION_GRANTED
         private const val LOOPBACK = "127.0.0.1"
         private const val READ_TIMEOUT_MS = 40_000
         private const val PING_MS = 15_000L

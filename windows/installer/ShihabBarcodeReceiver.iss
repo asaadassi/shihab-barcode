@@ -58,6 +58,8 @@ Filename: "{app}\ShihabBarcodeReceiver.exe"; Flags: nowait; Check: RelaunchReque
 [UninstallRun]
 ; The bundled adb leaves its server running: stop it so no file stays locked and nothing is left behind.
 Filename: "{app}\adb\adb.exe"; Parameters: "kill-server"; Flags: runhidden skipifdoesntexist; RunOnceId: "AdbKill"
+; The firewall rule the app added ("Allow" next to Wi-Fi): removed with one administrator prompt, only when it exists.
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""Barcode Receiver (Shihab App)"""; Verb: "runas"; Flags: shellexec runhidden waituntilterminated; Check: FirewallRuleExists; RunOnceId: "FirewallRule"
 
 [UninstallDelete]
 ; Nothing left behind: certificate and pairing key, settings, logs
@@ -71,4 +73,12 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 function RelaunchRequested(): Boolean;
 begin
   Result := ExpandConstant('{param:relaunch|0}') = '1';
+end;
+
+function FirewallRuleExists(): Boolean;
+var
+  Code: Integer;
+begin
+  Result := Exec(ExpandConstant('{sys}\netsh.exe'), 'advfirewall firewall show rule name="Barcode Receiver (Shihab App)"',
+    '', SW_HIDE, ewWaitUntilTerminated, Code) and (Code = 0);
 end;

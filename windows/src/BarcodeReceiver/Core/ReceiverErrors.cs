@@ -39,4 +39,7 @@ internal static class ReceiverErrors
 
     public static readonly ReceiverError ExportFailed = new("RCV-009", "The export file could not be written (folder read only, file open in Excel, disk full)",
         "تعذّر حفظ ملف التصدير.", "أغلق الملف إن كان مفتوحاً في Excel، أو اختر مجلداً آخر.");
+
+    public static readonly ReceiverError FirewallBlocked = new("RCV-010", "No Windows Firewall rule for the listener (the administrator prompt was declined, or netsh failed)",
+        "جدار حماية ويندوز يمنع الجوالات من الوصول عبر الواي فاي.", "اضغط «السماح» بجانب الواي فاي ووافق على طلب المسؤول، أو استخدم الكبل.");
 }

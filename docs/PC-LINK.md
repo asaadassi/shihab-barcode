@@ -30,6 +30,28 @@ shihabbarcode://pair?v=1&n=<PC name>&h=<ip1>,<ip2>&p=<port>&fp=<sha256>&k=<key>
 - `h`: the PC's IPv4 addresses on its active networks (Wi-Fi, Ethernet, USB tethering).
 - The certificate is a self-signed ECDSA P-256 one made on first run, kept with DPAPI (current user) with the key.
 
+## Pairing screen (phone)
+
+Choosing "Wi-Fi or cable" on the start screen opens **Pair with the PC** before the scanner: the local network
+permission (below), the pairing QR code read with the screen's own QR-only camera (the scanner's formats, filters
+and history do not apply; a pairing code read by the scanner is not kept in the history either), then the link
+state. The scanner opens once the PC answers `OK`; otherwise the reason is shown with its code (`BCD-005`,
+`BCD-007` to `BCD-012`): permission missing, old pairing key, other certificate, receiver closed (connection
+refused), no answer (firewall, another network, client isolation), no route, no address in the code. Tapping the
+PC card in the scanner opens the same screen.
+
+**Android 17:** with `targetSdk 37` connections to the local network need the runtime permission
+`ACCESS_LOCAL_NETWORK` (group Nearby devices); without it TCP connects to the PC time out while 127.0.0.1 (the
+cable) still works.
+
+## Firewall (PC)
+
+The receiver is installed per user, so Windows Defender Firewall has no rule for it, and the prompt on first run
+allows private networks only. "Allow" next to Wi-Fi (shown while the rule is missing, `RCV-010`) runs `netsh` with
+one administrator prompt: it removes the rules Windows made for the program (a "Block" from a dismissed prompt), then
+adds `Barcode Receiver (Shihab App)`: inbound TCP 5870 to 5879, this program, `remoteip=localsubnet`, all profiles.
+The uninstaller removes it.
+
 ## Connecting
 
 The phone tries, in order: `127.0.0.1:<port>` (the **cable**: the receiver runs `adb reverse tcp:<port>

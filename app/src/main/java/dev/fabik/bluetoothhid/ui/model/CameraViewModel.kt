@@ -64,6 +64,7 @@ import dev.fabik.bluetoothhid.utils.ScanImageFormat
 import dev.fabik.bluetoothhid.utils.ScanResolution
 import dev.fabik.bluetoothhid.utils.TemplateProcessor
 import dev.fabik.bluetoothhid.utils.TextMode
+import dev.fabik.bluetoothhid.shihab.PcLink
 import dev.fabik.bluetoothhid.utils.ZXingAnalyzer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.awaitCancellation
@@ -213,6 +214,14 @@ class CameraViewModel : ViewModel() {
                         scanImageFileName = scanImageName,
                         regexGroups = regexGroups
                     )
+                }
+
+                // Shihab: the PC pairing code carries the pairing key: it pairs the phone (sendString) and is never
+                // kept in the history, which can be exported or shared.
+                if (value!!.startsWith(PcLink.PREFIX)) {
+                    val pairing = value!!
+                    viewModelScope.launch { onBarcode(BarcodeResult(pairing, ZXingAnalyzer.format2Index(format), null, emptyList())) }
+                    return@detected
                 }
 
                 // Shihab: duplicates off: a code already in this session is dropped with a short notice

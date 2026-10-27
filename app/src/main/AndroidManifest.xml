@@ -30,6 +30,9 @@
     <!-- Shihab: the PC link to Barcode Receiver (local network or the USB cable through adb reverse), and in the
          GitHub build the update check. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Shihab: Android 17 (targetSdk 37) blocks the local network without this runtime permission: the Wi-Fi link to
+         the PC times out while the cable (127.0.0.1) still works. Asked on the pairing screen. -->
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
 
     <!-- Permission that external transport extensions must hold to receive scan broadcasts.
          "normal" allows any installed extension to request it; use "signature" to restrict
