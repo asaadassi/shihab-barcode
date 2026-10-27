@@ -151,7 +151,9 @@ fun DevicesViewModel.DeviceContent() {
             isBluetoothEnabled = it.bluetoothEnabled
 
             if (pairedDevices.isEmpty()) {
-                pairedDevices.addAll(it.pairedDevices)
+                pairedDevices.addAll(it.pairedDevices.filter { d ->
+                    DeviceInfo.isPossibleHost(d.bluetoothClass)
+                })
             }
 
             it.registerListener { _, state ->
@@ -197,6 +199,7 @@ fun DevicesViewModel.DeviceContent() {
  * Handles the system broadcast events when new devices are found
  * and when a discovery scan started or finished.
  */
+@SuppressLint("MissingPermission")
 @Composable
 fun DevicesViewModel.BroadcastListener() {
     val scope = rememberCoroutineScope()
@@ -226,7 +229,7 @@ fun DevicesViewModel.BroadcastListener() {
             @Suppress("DEPRECATION") it?.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
         }?.let { dev ->
             scope.launch {
-                if (!foundDevices.contains(dev)) {
+                if (!foundDevices.contains(dev) && DeviceInfo.isPossibleHost(dev.bluetoothClass)) {
                     foundDevices.add(dev)
                 }
             }

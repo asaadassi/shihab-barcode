@@ -3,6 +3,20 @@ package dev.fabik.bluetoothhid.utils
 import android.bluetooth.BluetoothClass
 
 object DeviceInfo {
+    // Device classes that can never act as a HID host (headphones, speakers, mice, watches...)
+    private val nonHostMajors = setOf(
+        BluetoothClass.Device.Major.AUDIO_VIDEO,
+        BluetoothClass.Device.Major.PERIPHERAL,
+        BluetoothClass.Device.Major.WEARABLE,
+        BluetoothClass.Device.Major.TOY,
+        BluetoothClass.Device.Major.HEALTH,
+        BluetoothClass.Device.Major.IMAGING,
+    )
+
+    // Devices without a class (some LE devices) are kept to be safe
+    fun isPossibleHost(bluetoothClass: BluetoothClass?): Boolean =
+        bluetoothClass == null || bluetoothClass.majorDeviceClass !in nonHostMajors
+
     fun deviceClassString(classMajor: Int?): String = when (classMajor) {
         BluetoothClass.Device.Major.AUDIO_VIDEO -> "AUDIO_VIDEO"
         BluetoothClass.Device.Major.COMPUTER -> "COMPUTER"
