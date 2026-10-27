@@ -223,9 +223,9 @@ object BarcodeAbout {
                         state = UpdateState.Downloading(0)
                         scope.launch {
                             val failure = withContext(Dispatchers.IO) {
-                                updater(ctx).downloadAndInstall(ctx, release) { done, total ->
+                                updater(ctx).downloadAndInstall(ctx, release, progress = { done, total ->
                                     if (total > 0) scope.launch { state = UpdateState.Downloading((done * 100 / total).toInt()) }
-                                }
+                                })
                             }
                             state = UpdateState.Idle
                             failure?.let {
