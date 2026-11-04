@@ -1,6 +1,8 @@
 package dev.fabik.bluetoothhid.shihab
 
 import android.app.Activity
+import app.shihab.shared.stats.ShihabStats
+import androidx.compose.material.icons.filled.BarChart
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.ContextWrapper
@@ -76,6 +78,8 @@ object BarcodeAbout {
             else ShihabLog.error(err.code, listOfNotNull(evt, detail).joinToString(": "), e)
         },
         prefs = ctx.applicationContext.getSharedPreferences("update", Context.MODE_PRIVATE),
+        // Versions below the minimum set on the Shihab Stats dashboard must update first
+        policyApp = ctx.packageName,
     ).also { updaterInstance = it }
 
     /** The settings items, in the order they are shown; the source and licence links (also in About) are advanced. */
@@ -84,6 +88,7 @@ object BarcodeAbout {
         add { LanguageItem() }
         if (BuildConfig.SELF_UPDATE) add { UpdateItem() }
         add { ReportItem() }
+        add { StatsItem() }
         if (advanced) add { SourceItem() }
     }
 
@@ -206,8 +211,10 @@ object BarcodeAbout {
             }
         }
         if (s is UpdateState.Available) {
+            // A version stopped from the Shihab Stats dashboard gets no "later": the dialog stays until it updates.
+            val blocked = remember(s) { updater(ctx).blockedByPolicy() }
             AlertDialog(
-                onDismissRequest = { state = UpdateState.Idle },
+                onDismissRequest = { if (!blocked) state = UpdateState.Idle },
                 title = { Text(stringResource(R.string.shihab_update_available, s.release.version)) },
                 text = {
                     Text(
@@ -236,10 +243,26 @@ object BarcodeAbout {
                         }
                     }) { Text(stringResource(R.string.shihab_update_install)) }
                 },
-                dismissButton = {
-                    TextButton(onClick = { state = UpdateState.Idle }) { Text(stringResource(R.string.shihab_later)) }
+                dismissButton = if (blocked) null else {
+                    { TextButton(onClick = { state = UpdateState.Idle }) { Text(stringResource(R.string.shihab_later)) } }
                 },
             )
+        }
+    }
+
+    /** Anonymous usage counts (ShihabStats): the choice shown, the shared window to change it. */
+    @Composable
+    private fun StatsItem() {
+        val ctx = LocalContext.current
+        val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+        var label by remember { mutableStateOf(ShihabStats.label(ctx)) }
+        ButtonPreference(
+            title = stringResource(app.shihab.shared.R.string.shihab_stats_title),
+            desc = label,
+            icon = Icons.Default.BarChart,
+        ) {
+            val activity = ctx.findActivity() ?: return@ButtonPreference
+            ShihabStats.pick(activity, BarcodeBrand.palette(ctx, dark)) { label = ShihabStats.label(ctx) }
         }
     }
 

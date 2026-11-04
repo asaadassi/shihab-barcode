@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.res.Configuration
 import app.shihab.shared.diag.ShihabLog
 import app.shihab.shared.locale.ShihabLang
+import app.shihab.shared.stats.ShihabStats
 import dev.fabik.bluetoothhid.BuildConfig
 
 /**
@@ -19,6 +20,8 @@ class BarcodeApp : Application() {
         ShihabLang.applyDefault(this)
         ShihabLog.init(this, prefix = "barcode", systemLog = BuildConfig.DEBUG)
         ShihabLog.installCrashHandler(this)
+        // Anonymous count of devices per version for the Shihab Stats dashboard
+        ShihabStats.start(this, BuildConfig.VERSION_NAME, log = { event, detail, e -> ShihabLog.info(event, mapOf("detail" to (detail ?: e?.javaClass?.simpleName ?: ""))) })
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
